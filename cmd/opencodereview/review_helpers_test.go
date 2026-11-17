@@ -14,7 +14,6 @@ import (
 
 	"github.com/alibaba/open-code-review/internal/model"
 	"github.com/alibaba/open-code-review/internal/session"
-	"github.com/alibaba/open-code-review/internal/tool"
 )
 
 func runPreview(cc *commonContext, opts reviewOptions, out io.Writer) error {
@@ -296,41 +295,6 @@ func TestLoadReviewResumeState(t *testing.T) {
 		_, err := loadReviewResumeState(dir, reviewOptions{resume: "does-not-exist", commit: "HEAD"})
 		if err == nil {
 			t.Fatal("expected error loading nonexistent resume session")
-		}
-	})
-}
-
-func TestInitMCPClients(t *testing.T) {
-	ctx := context.Background()
-	reg := tool.NewRegistry()
-
-	t.Run("nil config", func(t *testing.T) {
-		if got := initMCPClients(ctx, nil, reg, "/tmp", "v"); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
-	})
-
-	t.Run("empty servers", func(t *testing.T) {
-		if got := initMCPClients(ctx, &Config{}, reg, "/tmp", "v"); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
-	})
-
-	t.Run("remote without url skipped", func(t *testing.T) {
-		cfg := &Config{MCPServers: map[string]MCPServerConfig{
-			"r": {Type: "remote"},
-		}}
-		if got := initMCPClients(ctx, cfg, reg, "/tmp", "v"); len(got) != 0 {
-			t.Errorf("got %d clients, want 0", len(got))
-		}
-	})
-
-	t.Run("stdio without command skipped", func(t *testing.T) {
-		cfg := &Config{MCPServers: map[string]MCPServerConfig{
-			"s": {Type: "stdio"},
-		}}
-		if got := initMCPClients(ctx, cfg, reg, "/tmp", "v"); len(got) != 0 {
-			t.Errorf("got %d clients, want 0", len(got))
 		}
 	})
 }

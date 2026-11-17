@@ -14,7 +14,6 @@ import (
 	"github.com/alibaba/open-code-review/internal/llm"
 	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/stdout"
-	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/google/uuid"
 )
@@ -338,7 +337,6 @@ func (r *Runner) runMainTask(ctx context.Context, messages []llm.Message, taskKe
 		// iteration's meta replaces the previous one instead of nesting.
 		reqCtx := r.RequestContext(ctx, taskKey, session.MainTask, rec.RequestNo)
 
-		_, llmSpan := telemetry.StartLLMSpan(ctx, r.deps.Model)
 		request := llm.ChatRequest{
 			Model:     r.deps.Model,
 			Messages:  messages,
@@ -350,23 +348,15 @@ func (r *Runner) runMainTask(ctx context.Context, messages []llm.Message, taskKe
 		duration := time.Since(startTime)
 		if err != nil {
 			rec.SetError(err, duration)
-			telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-			llmSpan.End()
-			telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, 0, "error")
 			return false, StopNone, fmt.Errorf("LLM completion error: %w", err)
 		}
 		rec.SetResponse(resp, duration)
-		totalTokens := int64(0)
 		if resp.Usage != nil {
-			totalTokens = resp.Usage.TotalTokens
 			atomic.AddInt64(&r.totalInputTokens, resp.Usage.PromptTokens)
 			atomic.AddInt64(&r.totalOutputTokens, resp.Usage.CompletionTokens)
 			atomic.AddInt64(&r.totalCacheReadTokens, resp.Usage.CacheReadTokens)
 			atomic.AddInt64(&r.totalCacheWriteTokens, resp.Usage.CacheWriteTokens)
 		}
-		telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-		llmSpan.End()
-		telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, totalTokens, "ok")
 
 		content := resp.VisibleContent()
 		calls := resp.ToolCalls()
@@ -493,7 +483,6 @@ func (r *Runner) runGraceRound(ctx context.Context, messages []llm.Message, task
 	startTime := time.Now()
 	reqCtx := r.RequestContext(ctx, taskKey, session.MainTask, rec.RequestNo)
 
-	_, llmSpan := telemetry.StartLLMSpan(ctx, r.deps.Model)
 	request := llm.ChatRequest{
 		Model:     r.deps.Model,
 		Messages:  messages,
@@ -505,25 +494,17 @@ func (r *Runner) runGraceRound(ctx context.Context, messages []llm.Message, task
 	duration := time.Since(startTime)
 	if err != nil {
 		rec.SetError(err, duration)
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
-		telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, 0, "error")
 		fmt.Fprintf(stdout.Writer(), "[ocr] Grace round LLM error for %s: %v\n", taskKey, err)
 		return false
 	}
 
 	rec.SetResponse(resp, duration)
-	totalTokens := int64(0)
 	if resp.Usage != nil {
-		totalTokens = resp.Usage.TotalTokens
 		atomic.AddInt64(&r.totalInputTokens, resp.Usage.PromptTokens)
 		atomic.AddInt64(&r.totalOutputTokens, resp.Usage.CompletionTokens)
 		atomic.AddInt64(&r.totalCacheReadTokens, resp.Usage.CacheReadTokens)
 		atomic.AddInt64(&r.totalCacheWriteTokens, resp.Usage.CacheWriteTokens)
 	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
-	telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, totalTokens, "ok")
 
 	calls := resp.ToolCalls()
 	if len(calls) == 0 {

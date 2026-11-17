@@ -9,7 +9,7 @@
 // shape, including the summary object and the content/start_line fields.
 //
 // TestRealOCRBinaryScanMultiplePaths is opt-in: set OCR_BINARY to a real ocr
-// binary (for example ../dist/opencodereview) to run it. It exercises the
+// binary (for example ../dist/ocr) to run it. It exercises the
 // adapter's own argv against the real CLI, which is how the --path
 // comma-joining rule is verified end to end.
 package contract_test

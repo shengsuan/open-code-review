@@ -167,44 +167,6 @@ func validateReviewOptions(opts *reviewOptions) error {
 	return nil
 }
 
-func validateScanOptions(opts *scanOptions) error {
-	if err := validateAudience(opts.audience); err != nil {
-		return err
-	}
-	normalizedFormat, err := validateOutputFormat(opts.outputFormat)
-	if err != nil {
-		return err
-	}
-	opts.outputFormat = normalizedFormat
-	if opts.maxTools < 0 {
-		return fmt.Errorf("--max-tools must be a non-negative integer (0 means use template default)")
-	}
-	if opts.maxGitProcs < 0 {
-		return fmt.Errorf("--max-git-procs must be a non-negative integer (0 means use default 16)")
-	}
-	if opts.maxTokens < 0 {
-		return fmt.Errorf("--max-tokens must be a non-negative integer (0 means use configured or template default)")
-	}
-	if opts.preview && opts.resume != "" {
-		return fmt.Errorf("--preview and --resume cannot be used together")
-	}
-	if opts.maxTokensBudget < 0 {
-		return fmt.Errorf("--max-tokens-budget must be a non-negative integer (0 means unlimited)")
-	}
-	return nil
-}
-
-func validateDelegateOptions(opts *delegateOptions) error {
-	opts.to = normalizeDiffTarget(opts.from, opts.to, opts.commit)
-	if err := validateDiffMode(opts.from, opts.to, opts.commit); err != nil {
-		return err
-	}
-	if opts.format != "text" && opts.format != "json" {
-		return fmt.Errorf("invalid --format value %q: must be 'text' or 'json'", opts.format)
-	}
-	return nil
-}
-
 // registerReviewFlags registers all review command flags on cmd, binding to opts.
 func registerReviewFlags(cmd *cobra.Command, opts *reviewOptions) {
 	addRuleFlag(cmd, &opts.rulePath)
@@ -223,42 +185,4 @@ func registerReviewFlags(cmd *cobra.Command, opts *reviewOptions) {
 	cmd.RegisterFlagCompletionFunc("effort", completeEnum(template.EffortNames()...))
 	cmd.Flags().BoolVar(&opts.noFilter, "no-filter", false, "keep all review comments without LLM post-filtering")
 	addPreviewFlag(cmd, &opts.preview)
-}
-
-// registerScanFlags registers all scan command flags on cmd, binding to opts.
-func registerScanFlags(cmd *cobra.Command, opts *scanOptions) {
-	addRuleFlag(cmd, &opts.rulePath)
-	addRepoFlag(cmd, &opts.repoDir)
-	cmd.Flags().StringVar(&opts.paths, "path", "", "comma-separated repo-relative directories or files to scan (default: whole repo; nonexistent paths are an error)")
-	addExcludeFlag(cmd, &opts.excludes)
-	addOutputFlags(cmd, &opts.outputFormat, &opts.audience)
-	addOutputPathFlag(cmd, &opts.outputPath)
-	cmd.Flags().IntVar(&opts.concurrency, "concurrency", 8, "max concurrent subtasks")
-	cmd.Flags().IntVar(&opts.concurrentTaskTimeout, "timeout", 15, taskTimeoutHelp)
-	cmd.Flags().IntVar(&opts.maxTools, "max-tools", 0, "max tool call rounds per subtask; only takes effect when greater than template default")
-	cmd.Flags().IntVar(&opts.maxGitProcs, "max-git-procs", 16, "max concurrent git subprocesses")
-	cmd.Flags().IntVar(&opts.maxTokens, "max-tokens", 0, "per-file prompt token ceiling (0 = configured or template default)")
-	cmd.Flags().IntVar(&opts.maxTokensBudget, "max-tokens-budget", 0, "cap total token usage; checked before every LLM round and at dispatch (0 = unlimited)")
-	cmd.Flags().StringVarP(&opts.background, "background", "b", "", "optional requirement/business context for the scan")
-	cmd.Flags().BoolVarP(&opts.preview, "preview", "p", false, "preview which files will be scanned without running the LLM")
-	cmd.Flags().BoolVar(&opts.noPlan, "no-plan", false, "skip the per-file PLAN_TASK pre-pass")
-	cmd.Flags().BoolVar(&opts.noDedup, "no-dedup", false, "skip the per-batch DEDUP_TASK")
-	cmd.Flags().BoolVar(&opts.noSummary, "no-summary", false, "skip the post-run PROJECT_SUMMARY_TASK")
-	cmd.Flags().StringVar(&opts.batch, "batch", "", "override BATCH_STRATEGY: none | by-language | by-directory")
-	addProviderFlag(cmd, &opts.provider)
-	addModelFlag(cmd, &opts.model)
-	cmd.Flags().StringVar(&opts.resume, "resume", "", "resume from a previous scan session id")
-	cmd.RegisterFlagCompletionFunc("batch", completeEnum("none", "by-language", "by-directory"))
-}
-
-// registerDelegateFlags registers all delegate shared flags on cmd, binding to opts.
-func registerDelegateFlags(cmd *cobra.Command, opts *delegateOptions) {
-	addRepoFlag(cmd, &opts.repoDir)
-	addDiffFlags(cmd, &opts.from, &opts.to, &opts.commit)
-	addExcludeFlag(cmd, &opts.excludes)
-	addRuleFlag(cmd, &opts.rulePath)
-	addBackgroundFlags(cmd, &opts.background, &opts.backgroundFile)
-	cmd.Flags().IntVar(&opts.maxGitProcs, "max-git-procs", 16, "max concurrent git subprocesses")
-	cmd.Flags().StringVarP(&opts.format, "format", "f", "text", "output format: text or json (sarif is not supported by delegate mode)")
-	cmd.RegisterFlagCompletionFunc("format", completeEnum("text", "json"))
 }

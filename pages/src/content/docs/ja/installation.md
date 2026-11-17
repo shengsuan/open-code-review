@@ -156,8 +156,8 @@ OCR 自体を変更する場合、またはプリコンパイル済みバイナ�
 ```bash
 git clone https://github.com/alibaba/open-code-review.git
 cd open-code-review
-make build              # dist/opencodereview を生成（Windows では dist/opencodereview.exe）
-sudo cp dist/opencodereview /usr/local/bin/ocr
+make build              # dist/ocr を生成（Windows では dist/ocr.exe）
+sudo cp dist/ocr /usr/local/bin/ocr
 ```
 
 #### 他のプラットフォーム向けにビルドする

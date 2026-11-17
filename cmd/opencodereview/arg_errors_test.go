@@ -52,19 +52,6 @@ func TestArgCountErrors_AreActionable(t *testing.T) {
 			},
 		},
 		{
-			// maximumArgs: `session export` takes an optional session id, so
-			// only the too-many case is an error.
-			name: "session export with too many args",
-			args: []string{"session", "export", "one", "two"},
-			want: []string{
-				`"ocr session export" accepts at most 1 argument(s)`,
-				"Usage:\n  ocr session export [flags] [session-id]",
-				"Example:",
-				"ocr session export -o review.html",
-				"Run 'ocr session export --help' for more information.",
-			},
-		},
-		{
 			name: "config unset with no args",
 			args: []string{"config", "unset"},
 			want: []string{
@@ -95,14 +82,6 @@ func TestArgCountErrors_AreActionable(t *testing.T) {
 			want: []string{`"ocr session comments" requires exactly 1 argument(s) (<session-id>)`},
 		},
 		{
-			name: "delegate rule with no args",
-			args: []string{"delegate", "rule"},
-			want: []string{
-				`"ocr delegate rule" requires at least 1 argument(s) (<path...>)`,
-				"Usage:\n  ocr delegate rule",
-			},
-		},
-		{
 			// completion enumerates its values inline in Use, so they are reported
 			// once from ValidArgs rather than repeated in the signature.
 			name: "completion with no args lists valid values",
@@ -118,16 +97,6 @@ func TestArgCountErrors_AreActionable(t *testing.T) {
 			name: "flags do not satisfy the positional requirement",
 			args: []string{"rules", "check", "--rule", "custom.json"},
 			want: []string{`"ocr rules check" requires exactly 1 argument(s) (<file-path>)`},
-		},
-		{
-			// Reached through an alias, the error names the canonical path. That
-			// matches what "ocr d rule --help" prints, so the two stay in step.
-			name: "alias reports the canonical command path",
-			args: []string{"d", "rule"},
-			want: []string{
-				`"ocr delegate rule" requires at least 1 argument(s) (<path...>)`,
-				"Usage:\n  ocr delegate rule",
-			},
 		},
 		{
 			name: "sessions alias reports the canonical command path",
@@ -178,7 +147,6 @@ func TestArgCountErrors_MatchHelpOutput(t *testing.T) {
 		{"rules", "check"},
 		{"session", "show"},
 		{"session", "comments"},
-		{"delegate", "rule"},
 		{"completion"},
 	} {
 		name := strings.Join(path, " ")

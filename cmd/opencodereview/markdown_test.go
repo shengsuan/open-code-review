@@ -294,7 +294,7 @@ func TestMarkdownOutputDestinations(test *testing.T) {
 	for _, styled := range []bool{false, true} {
 		setColor(test, styled)
 		stdout := captureStdout(test, func() {
-			if err := emitRunResult(test.Context(), result, nil, time.Now(), "text", "human", nil, nil, os.Stdout, nil); err != nil {
+			if err := emitRunResult(result, nil, time.Now(), "text", "human", nil, nil, os.Stdout, nil); err != nil {
 				test.Fatal(err)
 			}
 		})
@@ -309,7 +309,7 @@ func TestMarkdownOutputDestinations(test *testing.T) {
 			test.Fatalf("plain stdout was changed: %q", stdout)
 		}
 		var buffer bytes.Buffer
-		if err := emitRunResult(test.Context(), result, nil, time.Now(), "text", "human", nil, nil, &buffer, nil); err != nil {
+		if err := emitRunResult(result, nil, time.Now(), "text", "human", nil, nil, &buffer, nil); err != nil {
 			test.Fatal(err)
 		}
 		if !strings.Contains(buffer.String(), markdown) || strings.Contains(buffer.String(), "\x1b") {
@@ -322,7 +322,7 @@ func TestMarkdownOutputDestinations(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if err := emitRunResult(test.Context(), result, nil, time.Now(), "text", "human", nil, nil, writer, nil); err != nil {
+	if err := emitRunResult(result, nil, time.Now(), "text", "human", nil, nil, writer, nil); err != nil {
 		test.Fatal(err)
 	}
 	if err := closeWriter(); err != nil {
@@ -333,7 +333,7 @@ func TestMarkdownOutputDestinations(test *testing.T) {
 		test.Fatalf("file output changed: %q, %v", content, err)
 	}
 	jsonText := captureStdout(test, func() {
-		if err := emitRunResult(test.Context(), result, nil, time.Now(), "json", "human", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(result, nil, time.Now(), "json", "human", nil, nil, os.Stdout, nil); err != nil {
 			test.Fatal(err)
 		}
 	})

@@ -1,66 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 alibaba/open-code-review Contributors
 
-package telemetry
+package console
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/alibaba/open-code-review/internal/stdout"
 )
-
-// Event emits a structured event as a span with immediate end.
-func Event(ctx context.Context, name string, attrs ...attribute.KeyValue) {
-	if !IsEnabled() || ctx == nil {
-		return
-	}
-
-	opts := []trace.SpanStartOption{trace.WithAttributes(attrs...)}
-	_, span := otel.GetTracerProvider().Tracer(serviceName).Start(ctx, "event."+name, opts...)
-	defer span.End()
-}
-
-// Eventf is like Event but includes a message attribute.
-func Eventf(ctx context.Context, name string, msg string, attrs ...attribute.KeyValue) {
-	Event(ctx, name, append(attrs, attribute.String("message", msg))...)
-}
-
-// ErrorEvent emits an error event with error status.
-func ErrorEvent(ctx context.Context, name string, err error, extraAttrs ...attribute.KeyValue) {
-	if !IsEnabled() || ctx == nil || err == nil {
-		return
-	}
-
-	attrs := append(extraAttrs, attribute.String("error", err.Error()))
-	_, span := otel.GetTracerProvider().Tracer(serviceName).Start(ctx, "event."+name,
-		trace.WithAttributes(attrs...))
-	span.SetStatus(codes.Error, err.Error())
-	span.RecordError(err)
-	span.End()
-}
-
-// PhaseEvent records a review phase completion with duration and optional error.
-func PhaseEvent(ctx context.Context, phase string, filePath string, dur time.Duration, err error) {
-	attrs := []attribute.KeyValue{
-		attribute.String("phase", phase),
-		attribute.String("file.path", filePath),
-		attribute.Int64("duration_ms", dur.Milliseconds()),
-	}
-	if err != nil {
-		ErrorEvent(ctx, "phase.completed", err, attrs...)
-	} else {
-		Event(ctx, "phase.completed", attrs...)
-	}
-}
 
 // FormatDuration returns a human-readable duration string for console output.
 func FormatDuration(dur time.Duration) string {
@@ -124,8 +74,7 @@ func PrintToolCallError(toolName string, err error) {
 	fmt.Fprintf(stdout.ErrorWriter(), "[ocr]   ✘ %s failed: %v\n", toolName, err)
 }
 
-// summarizeArgs extracts a concise key=value summary from tool arguments for console display.
-// It picks the most human-readable fields depending on the argument keys.
+// summarizeArgs picks the most human-readable tool argument for console display.
 func summarizeArgs(args map[string]any) string {
 	parts := make([]string, 0, len(args))
 	for k, v := range args {

@@ -137,24 +137,19 @@ make build
 ├── imgs/                 # Изображения логотипа, бенчмарков и обзора
 ├── internal/
 │   ├── agent/            # Логика ревью-агента
-│   ├── chatgptauth/      # OAuth и управление учётными данными ChatGPT
 │   ├── config/           # Управление конфигурацией
-│   ├── delegate/         # Спеки ревью для режима делегирования (без LLM)
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/             # Разбор git-диффов
 │   ├── gitcmd/           # Ограниченный запуск git-подпроцессов
 │   ├── llm/              # Клиент LLM API (Anthropic, Bedrock и OpenAI)
 │   ├── llmloop/          # Общий цикл вызова инструментов для подзадач
-│   ├── mcp/              # Клиент MCP-сервера и адаптер инструментов
 │   ├── model/            # Модели данных
 │   ├── pathutil/         # Канонические пути и проверка вложенности
 │   ├── release/          # Проверки имён URL артефактов релиза
-│   ├── scan/             # Пофайловое ревью кода (ocr scan)
 │   ├── session/          # Управление сессиями ревью
 │   ├── stdout/           # Подменяемый writer для stdout
 │   ├── suggestdiff/      # Построчные diff для отрисовки предложений
-│   ├── telemetry/        # Интеграция с OpenTelemetry
-│   ├── tool/             # Встроенные инструменты (file_read, code_search и др.)
-│   └── viewer/           # WebUI-просмотрщик сессий
+│   └── tool/             # Встроенные инструменты (file_read, code_search и др.)
 ├── npm/                  # Опциональные бинарные пакеты по платформам
 ├── pages/                # Лендинг
 ├── plugins/              # Плагины для coding-агентов

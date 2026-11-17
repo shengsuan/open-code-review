@@ -36,8 +36,6 @@ type ResolvedEndpoint struct {
 	RetryCodes            []int // additional HTTP status codes that trigger exponential-backoff retry
 	RequiresStreaming     bool
 	RejectsSamplingParams bool
-	ChatGPTPlan           bool
-	ChatGPTAccount        string
 
 	// AmbientAuth marks an endpoint that carries no token and needs no base
 	// URL, because the transport supplies both — AWS SigV4 signing derives the
@@ -187,9 +185,7 @@ func finalizeResolvedEndpoint(source string, ep ResolvedEndpoint, env envOverrid
 	if ep.Source == "" {
 		ep.Source = source
 	}
-	if !ep.ChatGPTPlan {
-		ep.Model = stripModelSuffix(ep.Model)
-	}
+	ep.Model = stripModelSuffix(ep.Model)
 	if env.hasTimeout {
 		ep.Timeout = env.timeout
 	}
@@ -412,9 +408,6 @@ func tryProviderConfig(cfg configFile, modelOverride string, callerContext conte
 		entry, ok = cfg.Providers[cfg.Provider]
 	} else {
 		entry, ok = cfg.CustomProviders[cfg.Provider]
-	}
-	if isPreset && preset.Name == "chatgpt" && ok {
-		return resolveChatGPT(cfg, entry, modelOverride, callerContext)
 	}
 	if !ok {
 		section := "providers"

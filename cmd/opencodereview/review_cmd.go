@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,13 +17,9 @@ import (
 	"github.com/alibaba/open-code-review/internal/config/toolsconfig"
 	"github.com/alibaba/open-code-review/internal/diff"
 	"github.com/alibaba/open-code-review/internal/llm"
-	"github.com/alibaba/open-code-review/internal/mcp"
 	"github.com/alibaba/open-code-review/internal/session"
-	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/spf13/cobra"
-
-	"go.opentelemetry.io/otel/codes"
 )
 
 type reviewOptions struct {
@@ -233,13 +228,6 @@ func executeReviewContext(ctx context.Context, opts reviewOptions) (retErr error
 	}
 	tools := buildToolRegistryWithCodeAccess(rt.Collector, codeTools.reader, codeTools.access)
 
-	mcpClients := initMCPClients(ctx, rt.AppCfg, tools, cc.RepoDir, Version)
-	defer closeReviewMCPClients(mcpClients)
-
-	mcpToolDefs := mcp.CollectToolDefs(mcpClients, tools)
-	planToolDefs = append(planToolDefs, mcpToolDefs...)
-	mainToolDefs = append(mainToolDefs, mcpToolDefs...)
-
 	ag := agent.New(agent.Args{
 		RepoDir:               cc.RepoDir,
 		From:                  opts.from,
@@ -277,19 +265,7 @@ func executeReviewContext(ctx context.Context, opts reviewOptions) (retErr error
 	q := newQuietHandle(opts.outputFormat, opts.audience)
 	defer q.Restore()
 
-	runCtx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(ctx), "review.run")
-	defer span.End()
-	telemetry.SetAttr(span, "review.repo", cc.RepoDir)
-	telemetry.SetAttr(span, "review.from", opts.from)
-	telemetry.SetAttr(span, "review.to", opts.to)
-	telemetry.SetAttr(span, "review.model", rt.Model)
-	var traceID string
-	if telemetry.IsEnabled() {
-		traceID = telemetry.TraceIDFromContext(ctx)
-		if !isMachineReadable(opts.outputFormat) {
-			fmt.Fprintf(os.Stderr, "[ocr] TraceID: %s\n", traceID)
-		}
-	}
+	runCtx := ctx
 	startTime := time.Now()
 
 	comments, runErr := ag.Run(runCtx)
@@ -311,10 +287,6 @@ func executeReviewContext(ctx context.Context, opts reviewOptions) (retErr error
 	}
 
 	resultErr := reviewResultError(runErr, manifest)
-	if resultErr != nil {
-		span.SetStatus(codes.Error, resultErr.Error())
-		span.RecordError(resultErr)
-	}
 
 	// A successfully constructed manifest is publishable even when execution or
 	// session delivery failed. Emit it first, then return the independent process
@@ -322,7 +294,7 @@ func executeReviewContext(ctx context.Context, opts reviewOptions) (retErr error
 	var emitErr error
 	emitted := manifest != nil || runErr == nil
 	if emitted {
-		emitErr = emitRunResult(runCtx, ag, comments, startTime, opts.outputFormat, opts.audience, q, llmIdentity, out, retryReport)
+		emitErr = emitRunResult(ag, comments, startTime, opts.outputFormat, opts.audience, q, llmIdentity, out, retryReport)
 		if emitErr != nil {
 			emitErr = fmt.Errorf("emit review result: %w", emitErr)
 		} else {
@@ -558,88 +530,6 @@ func runPreviewContext(ctx context.Context, cc *commonContext, opts reviewOption
 	return outputPreview(preview, opts.outputFormat, out)
 }
 
-func initMCPClients(ctx context.Context, cfg *Config, tools *tool.Registry, repoDir, version string) []*mcp.Client {
-	if cfg == nil || len(cfg.MCPServers) == 0 {
-		return nil
-	}
-
-	mcpNames := make([]string, 0, len(cfg.MCPServers))
-	for name := range cfg.MCPServers {
-		mcpNames = append(mcpNames, name)
-	}
-	sort.Strings(mcpNames)
-
-	var clients []*mcp.Client
-	for _, name := range mcpNames {
-		serverCfg := cfg.MCPServers[name]
-
-		isRemote := serverCfg.Type == "remote"
-
-		if isRemote {
-			if serverCfg.URL == "" {
-				fmt.Fprintf(os.Stderr, "[ocr] WARNING: remote MCP server %q has no URL configured, skipping\n", name)
-				continue
-			}
-			initCtx, initCancel := context.WithTimeout(ctx, 30*time.Second)
-			mc, err := mcp.NewRemoteClient(initCtx, name, serverCfg.URL, serverCfg.Headers, version)
-			initCancel()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to connect to remote MCP server %q: %v\n", name, err)
-				continue
-			}
-			clients = append(clients, mc)
-			mcp.RegisterAll(tools, mc, serverCfg.Tools)
-			continue
-		}
-
-		if serverCfg.Command == "" {
-			fmt.Fprintf(os.Stderr, "[ocr] WARNING: MCP server %q has no command configured, skipping\n", name)
-			continue
-		}
-		if serverCfg.Setup != "" {
-			fmt.Fprintf(os.Stderr, "[ocr] Running setup for MCP server %q: %s\n", name, serverCfg.Setup)
-			setupCtx, setupCancel := context.WithTimeout(ctx, 5*time.Minute)
-			setupCmd := shellCommand(setupCtx, serverCfg.Setup)
-			setupCmd.Dir = repoDir
-			configureProcessGroup(setupCmd)
-			output, err := setupCmd.CombinedOutput()
-			setupCancel()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "[ocr] ERROR: MCP server %q setup command failed.\n", name)
-				fmt.Fprintf(os.Stderr, "[ocr]   Command: %s\n", serverCfg.Setup)
-				fmt.Fprintf(os.Stderr, "[ocr]   Working directory: %s\n", repoDir)
-				fmt.Fprintf(os.Stderr, "[ocr]   Error: %v\n", err)
-				if len(output) > 0 {
-					fmt.Fprintf(os.Stderr, "[ocr]   Output:\n%s\n", string(output))
-				}
-				fmt.Fprintf(os.Stderr, "[ocr]   Skipping MCP server %q — review will proceed without it.\n", name)
-				continue
-			}
-		}
-
-		initCtx, initCancel := context.WithTimeout(ctx, 30*time.Second)
-		mc, err := mcp.NewClient(initCtx, name, serverCfg.Command, serverCfg.Args, serverCfg.Env, repoDir, version)
-		initCancel()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to start MCP server %q: %v\n", name, err)
-			continue
-		}
-		clients = append(clients, mc)
-		mcp.RegisterAll(tools, mc, serverCfg.Tools)
-	}
-	return clients
-}
-
-// closeReviewMCPClients is a variable so tests can observe the shutdown
-// boundary without starting an intentionally unresponsive subprocess.
-var closeReviewMCPClients = func(clients []*mcp.Client) {
-	closeCtx, cancel := context.WithTimeout(context.Background(), mcp.CloseAllTimeout)
-	defer cancel()
-	if err := mcp.CloseAll(closeCtx, clients); err != nil {
-		fmt.Fprintf(os.Stderr, "[ocr] WARNING: %v\n", err)
-	}
-}
-
 func buildToolRegistry(collector *tool.CommentCollector, fr *tool.FileReader) *tool.Registry {
 	return buildToolRegistryWithCodeAccess(collector, fr, nil)
 }
@@ -658,4 +548,19 @@ func buildToolRegistryWithCodeAccess(collector *tool.CommentCollector, fr *tool.
 	reg.Register(search)
 	reg.Register(&tool.CodeCommentProvider{Collector: collector})
 	return reg
+}
+
+func splitPaths(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

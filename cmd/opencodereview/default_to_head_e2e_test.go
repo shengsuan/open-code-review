@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -103,73 +102,5 @@ func TestReviewFromWithoutToUsesHEADRangeE2E(t *testing.T) {
 		if paths[unexpected] {
 			t.Errorf("%s must not be reviewed by a committed range: %v", unexpected, paths)
 		}
-	}
-}
-
-func TestDelegateFromWithoutToUsesHEADRangeE2E(t *testing.T) {
-	if os.Getenv("OCR_TEST_DELEGATE_DEFAULT_HEAD") == "1" {
-		rootCmd.SetArgs(os.Args[3:])
-		os.Exit(run())
-	}
-	freshOCRHome(t)
-	repo := newDivergedBranchRepo(t)
-	runDelegate := func(subcommand string, extra ...string) []byte {
-		t.Helper()
-		args := []string{"-test.run=^TestDelegateFromWithoutToUsesHEADRangeE2E$", "--", "delegate", subcommand, "--repo", repo, "--format", "json"}
-		args = append(args, extra...)
-		cmd := exec.Command(os.Args[0], args...)
-		cmd.Dir = repo
-		cmd.Env = append(os.Environ(), "OCR_TEST_DELEGATE_DEFAULT_HEAD=1", "OCR_NO_UPDATE=1", "OCR_ENABLE_TELEMETRY=0")
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		out, err := cmd.Output()
-		if err != nil {
-			t.Fatalf("delegate %s %v: %v\n%s", subcommand, extra, err, stderr.String())
-		}
-		return out
-	}
-
-	shorthand := runDelegate("preview", "--from", "main")
-	explicit := runDelegate("preview", "--from", "main", "--to", "HEAD")
-	if !bytes.Equal(shorthand, explicit) {
-		t.Fatalf("shorthand preview differs from explicit target:\n%s\n%s", shorthand, explicit)
-	}
-	var preview delegatePreviewJSON
-	if err := json.Unmarshal(shorthand, &preview); err != nil {
-		t.Fatal(err)
-	}
-	if preview.Mode != "range" || preview.From != "main" || preview.To != "HEAD" || preview.MergeBase == "" || preview.Commit != "" {
-		t.Fatalf("unexpected range metadata: %+v", preview)
-	}
-	if preview.TotalFiles != 1 || len(preview.ReviewableFiles) != 1 || preview.ReviewableFiles[0].Path != "b.go" {
-		t.Fatalf("range must contain only the feature commit: %+v", preview)
-	}
-
-	shorthand = runDelegate("rule", "--from", "main", "b.go")
-	explicit = runDelegate("rule", "--from", "main", "--to", "HEAD", "b.go")
-	if !bytes.Equal(shorthand, explicit) {
-		t.Fatalf("shorthand rules differ from explicit target:\n%s\n%s", shorthand, explicit)
-	}
-	var rules delegateRulesJSON
-	if err := json.Unmarshal(shorthand, &rules); err != nil {
-		t.Fatal(err)
-	}
-	if len(rules.Groups) != 1 || !reflect.DeepEqual(rules.Groups[0].Files, []string{"b.go"}) || rules.Groups[0].Rule == "" {
-		t.Fatalf("expected rules for the feature file: %+v", rules)
-	}
-
-	preview = delegatePreviewJSON{}
-	if err := json.Unmarshal(runDelegate("preview"), &preview); err != nil {
-		t.Fatal(err)
-	}
-	if preview.Mode != "workspace" || preview.From != "" || preview.To != "" || preview.MergeBase != "" || preview.Commit != "" {
-		t.Fatalf("plain delegate preview must remain workspace mode: %+v", preview)
-	}
-	paths := make(map[string]bool, len(preview.ReviewableFiles))
-	for _, file := range preview.ReviewableFiles {
-		paths[file.Path] = true
-	}
-	if !reflect.DeepEqual(paths, map[string]bool{"a.go": true, "staged.go": true, "untracked.go": true}) {
-		t.Fatalf("workspace must include only local changes: %v", paths)
 	}
 }

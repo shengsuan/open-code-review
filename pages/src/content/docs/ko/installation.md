@@ -144,8 +144,8 @@ OCR 자체를 수정하거나 사전 빌드 바이너리가 없는 플랫폼에�
 ```bash
 git clone https://github.com/alibaba/open-code-review.git
 cd open-code-review
-make build              # dist/opencodereview 생성 (Windows에서는 dist/opencodereview.exe)
-sudo cp dist/opencodereview /usr/local/bin/ocr
+make build              # dist/ocr 생성 (Windows에서는 dist/ocr.exe)
+sudo cp dist/ocr /usr/local/bin/ocr
 ```
 
 #### 다른 플랫폼용 빌드 {#build-for-another-platform}

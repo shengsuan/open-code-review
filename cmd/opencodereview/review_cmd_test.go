@@ -25,11 +25,7 @@ func TestCommandsRejectToolsOverride(t *testing.T) {
 		} {
 			t.Run(command+"/"+strings.Join(args, " "), func(t *testing.T) {
 				var err error
-				if command == "review" {
-					_, err = parseReviewFlags(args)
-				} else {
-					_, err = parseScanFlags(args)
-				}
+				_, err = parseReviewFlags(args)
 				if err == nil || !strings.Contains(err.Error(), "unknown flag: --tools") {
 					t.Fatalf("got %v, want unknown tools flag", err)
 				}
@@ -39,14 +35,10 @@ func TestCommandsRejectToolsOverride(t *testing.T) {
 }
 
 func TestCommandsToolFlags(t *testing.T) {
-	for _, command := range []string{"review", "scan"} {
+	for _, command := range []string{"review"} {
 		t.Run(command, func(t *testing.T) {
 			cmd := &cobra.Command{Use: command}
-			if command == "review" {
-				registerReviewFlags(cmd, &reviewOptions{})
-			} else {
-				registerScanFlags(cmd, &scanOptions{})
-			}
+			registerReviewFlags(cmd, &reviewOptions{})
 			if cmd.Flags().Lookup("tools") != nil || strings.Contains(cmd.Flags().FlagUsages(), "--tools") {
 				t.Fatal("removed tools override is still advertised")
 			}

@@ -6,7 +6,6 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -353,10 +352,10 @@ func TestBuildResponsesParams_MaxTokensAndTemperature(t *testing.T) {
 	})
 	planParams := plan.buildResponsesParams("gpt-5.6-luna", req)
 	if planParams.Temperature.Valid() {
-		t.Errorf("ChatGPT plan Temperature = %v, want unset", planParams.Temperature.Value)
+		t.Errorf("RejectsSamplingParams Temperature = %v, want unset", planParams.Temperature.Value)
 	}
 	if planParams.MaxOutputTokens.Valid() {
-		t.Errorf("ChatGPT plan MaxOutputTokens = %v, want unset", planParams.MaxOutputTokens.Value)
+		t.Errorf("RejectsSamplingParams MaxOutputTokens = %v, want unset", planParams.MaxOutputTokens.Value)
 	}
 }
 
@@ -903,30 +902,6 @@ func TestAccumulateResponseStreamRejectsTerminalBeyondLimit(t *testing.T) {
 	}
 }
 
-func TestChatGPTStreamFailureDetails(t *testing.T) {
-	for _, tc := range []struct {
-		name, eventType, details, want string
-	}{
-		{"failed_missing", "failed", "", "response.failed: rate limited; Manage usage: "},
-		{"failed_null", "failed", `,"incomplete_details":null`, "response.failed: rate limited; Manage usage: "},
-		{"incomplete_null", "incomplete", `,"incomplete_details":null`, "response.incomplete: rate limited; Manage usage: "},
-		{"incomplete_reason", "incomplete", `,"incomplete_details":{"reason":"max_output_tokens"}`, `response.incomplete: rate limited {"reason":"max_output_tokens"}; Manage usage: `},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			events := responseStreamEvents(t, `{"type":"response.`+tc.eventType+`","response":{"id":"resp_failed","status":"`+tc.eventType+`","error":{"code":"rate_limit_exceeded","message":"rate limited","param":"model"}`+tc.details+`}}`)
-			accumulator := responseStreamAccumulator{requireCompleted: true}
-			err := accumulator.add(events[0])
-			var streamErr *responseStreamEventError
-			if !errors.As(err, &streamErr) || streamErr.code != "rate_limit_exceeded" || streamErr.param != "model" {
-				t.Fatal("structured error details were lost", err)
-			}
-			if streamErr.message != tc.want+"https://chatgpt.com/settings/usage" {
-				t.Fatalf("unexpected error message: %s", streamErr.message)
-			}
-		})
-	}
-}
-
 func TestOpenAIResponsesClient_StreamingIncompleteContract(t *testing.T) {
 	for _, status := range []string{"incomplete", "failed"} {
 		t.Run(status, func(t *testing.T) {
@@ -1033,10 +1008,10 @@ func TestOpenAIResponsesClient_StreamingSSEPreservesNativeReasoning(t *testing.T
 		t.Errorf("stream = %v, want true", gotBody["stream"])
 	}
 	if _, ok := gotBody["temperature"]; ok {
-		t.Errorf("ChatGPT plan request included temperature: %v", gotBody["temperature"])
+		t.Errorf("request with RejectsSamplingParams included temperature: %v", gotBody["temperature"])
 	}
 	if _, ok := gotBody["max_output_tokens"]; ok {
-		t.Errorf("ChatGPT plan request included max_output_tokens: %v", gotBody["max_output_tokens"])
+		t.Errorf("request with RejectsSamplingParams included max_output_tokens: %v", gotBody["max_output_tokens"])
 	}
 	if resp.Usage == nil || resp.Usage.CacheWriteTokens != 3 {
 		t.Fatalf("usage = %+v, want raw cache_creation_input_tokens=3", resp.Usage)

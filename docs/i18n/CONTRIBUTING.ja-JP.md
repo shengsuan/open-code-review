@@ -136,24 +136,19 @@ make build
 ├── imgs/                 # ロゴ、ベンチマーク、ハイライト画像
 ├── internal/
 │   ├── agent/            # レビューエージェントのロジック
-│   ├── chatgptauth/      # ChatGPT の OAuth と認証情報管理
 │   ├── config/           # 設定管理
-│   ├── delegate/         # 委任モードのレビュー仕様（LLM なし）
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/             # Git diffのパース
 │   ├── gitcmd/           # 同時実行数を制限する git サブプロセスランナー
 │   ├── llm/              # LLM APIクライアント（Anthropic、Bedrock、OpenAI）
 │   ├── llmloop/          # サブタスク共有のツール使用ループ
-│   ├── mcp/              # MCP サーバークライアントとツールアダプター
 │   ├── model/            # データモデル
 │   ├── pathutil/         # 正規化パスと包含チェック
 │   ├── release/          # リリース資産 URL の命名チェック
-│   ├── scan/             # ファイル全体のコードレビュー（ocr scan）
 │   ├── session/          # レビューセッション管理
 │   ├── stdout/           # 切り替え可能な stdout ライター
 │   ├── suggestdiff/      # 提案表示用の行単位 diff
-│   ├── telemetry/        # OpenTelemetry統合
-│   ├── tool/             # 組み込みツール（file_read、code_searchなど）
-│   └── viewer/           # WebUIセッションビューアー
+│   └── tool/             # 組み込みツール（file_read、code_searchなど）
 ├── npm/                  # プラットフォーム別の optional バイナリパッケージ
 ├── pages/                # ランディングページ
 ├── plugins/              # コーディングエージェント向けプラグイン

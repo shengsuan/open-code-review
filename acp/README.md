@@ -475,7 +475,7 @@ line numbers, summary, manifest classifications) rather than just counts.
   fields, `thinking`) that fail if the DTO drifts from the documented output;
 - `TestRealOCRBinaryScanMultiplePaths`, an opt-in integration test. Set
   `OCR_BINARY` to run the adapter's own argv against a real binary:
-  `OCR_BINARY=../dist/opencodereview make test` from `acp/`. It pins the
+  `OCR_BINARY=../dist/ocr make test` from `acp/`. It pins the
   `--path` comma-joining rule end to end (a repeated `--path` would silently
   scan only the last path).
 

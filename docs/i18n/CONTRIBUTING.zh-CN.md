@@ -135,24 +135,19 @@ make build
 ├── imgs/                 # 徽标、基准与亮点图片
 ├── internal/
 │   ├── agent/            # 评审 Agent 逻辑
-│   ├── chatgptauth/      # ChatGPT OAuth 与凭证管理
 │   ├── config/           # 配置管理
-│   ├── delegate/         # 委托模式评审规格（不调用 LLM）
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/             # Git diff 解析
 │   ├── gitcmd/           # 有界并发的 git 子进程运行器
 │   ├── llm/              # LLM API 客户端（Anthropic、Bedrock 与 OpenAI）
 │   ├── llmloop/          # 共享的子任务工具调用循环
-│   ├── mcp/              # MCP 服务客户端与工具适配器
 │   ├── model/            # 数据模型
 │   ├── pathutil/         # 规范路径与包含关系检查
 │   ├── release/          # 发布产物 URL 命名检查
-│   ├── scan/             # 全文件代码评审（ocr scan）
 │   ├── session/          # 评审会话管理
 │   ├── stdout/           # 可切换的 stdout 写入器
 │   ├── suggestdiff/      # 建议渲染用的行级 diff
-│   ├── telemetry/        # OpenTelemetry 集成
-│   ├── tool/             # 内置工具（file_read, code_search 等）
-│   └── viewer/           # WebUI 会话查看器
+│   └── tool/             # 内置工具（file_read, code_search 等）
 ├── npm/                  # 各平台可选二进制包
 ├── pages/                # 落地页
 ├── plugins/              # 编程 Agent 插件

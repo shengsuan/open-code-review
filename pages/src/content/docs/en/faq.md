@@ -412,8 +412,8 @@ need new providers; an issue for Hg support is open
 
 The static binary published in releases is named after the project
 (`opencodereview`); the NPM wrapper installs it as `ocr` for
-ergonomics. If you build from source you get `dist/opencodereview`
-(`dist/opencodereview.exe` on Windows) —
+ergonomics. If you build from source you get `dist/ocr`
+(`dist/ocr.exe` on Windows) —
 copy it to `ocr` on your `$PATH`.
 
 ### How do I uninstall?

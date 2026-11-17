@@ -55,14 +55,10 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(reviewCmd)
-	rootCmd.AddCommand(scanCmd)
-	rootCmd.AddCommand(delegateCmd)
 	rootCmd.AddCommand(sessionCmd)
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(llmCmd)
 	rootCmd.AddCommand(rulesCmd)
-	rootCmd.AddCommand(viewerCmd)
 	rootCmd.AddCommand(completionCmd)
 }
 

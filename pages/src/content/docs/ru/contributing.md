@@ -41,7 +41,7 @@ git clone https://github.com/<your-username>/open-code-review.git
 cd open-code-review
 git remote add upstream https://github.com/alibaba/open-code-review.git
 
-make build       # writes dist/opencodereview (dist/opencodereview.exe on Windows)
+make build       # writes dist/ocr (dist/ocr.exe on Windows)
 make test        # LC_ALL=C go test -v -race -count=1 ./...
 ```
 
@@ -51,18 +51,18 @@ make test        # LC_ALL=C go test -v -race -count=1 ./...
 ### Запуск локальной сборки
 
 ```bash
-./dist/opencodereview review --preview        # macOS / Linux
+./dist/ocr review --preview        # macOS / Linux
 .\dist\opencodereview.exe review --preview   # Windows (PowerShell / cmd)
 ```
 
 Для удобства создайте в `~/bin/ocr-dev` символическую ссылку на
-`dist/opencodereview`, чтобы вызывать `ocr-dev` из любого репозитория.
+`dist/ocr`, чтобы вызывать `ocr-dev` из любого репозитория.
 
 ### Цели Make
 
 | Цель | Назначение |
 |---|---|
-| `make build` | Собирает бинарный файл для текущей платформы → `dist/opencodereview` (`dist/opencodereview.exe` в Windows). |
+| `make build` | Собирает бинарный файл для текущей платформы → `dist/ocr` (`dist/ocr.exe` в Windows). |
 | `make build-darwin-amd64` | Кросс-компиляция для macOS Intel. |
 | `make build-darwin-arm64` | Кросс-компиляция для macOS Apple Silicon. |
 | `make build-linux-amd64` | Кросс-компиляция для Linux x86_64. |
@@ -136,24 +136,19 @@ open-code-review/
 ├── imgs/                      # Изображения и логотипы для README
 ├── internal/
 │   ├── agent/                 # Логика агента ревью и запуск подагентов
-│   ├── chatgptauth/           # ChatGPT OAuth и управление учётными данными
 │   ├── config/                # Шаблоны, правила, список разрешений, встроенный JSON
-│   ├── delegate/              # Генерация спецификаций ревью без вызовов LLM
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/                  # Разбор Git diff
 │   ├── gitcmd/                # Запуск Git в дочерних процессах
 │   ├── llm/                   # Клиенты LLM и определение конечных точек API
 │   ├── llmloop/               # Общий цикл вызова инструментов LLM для review и scan
-│   ├── mcp/                   # Клиенты MCP и адаптеры инструментов
 │   ├── model/                 # Структуры данных (LlmComment, Diff, …)
 │   ├── pathutil/              # Утилиты для работы с путями
 │   ├── release/               # Проверки согласованности имён артефактов релиза
-│   ├── scan/                  # Ревью кода полных файлов
 │   ├── session/               # Запись сеансов в JSONL
 │   ├── stdout/                # Вывод в stdout с возможностью отключения
 │   ├── suggestdiff/           # Отображение diff предлагаемых изменений
-│   ├── telemetry/             # Настройка OpenTelemetry и вспомогательные функции
-│   ├── tool/                  # Реестр инструментов и реализации провайдеров
-│   └── viewer/                # Встроенный HTTP UI для просмотра сеансов ревью
+│   └── tool/                  # Реестр инструментов и реализации провайдеров
 ├── pages/                     # Главная страница сайта и документация (отдельное приложение React)
 ├── plugins/                   # Интеграции с агентами для программирования (Claude Code, Codex, OpenCode, …)
 ├── extensions/                # Расширения VS Code и IntelliJ IDEA, общий фронтенд

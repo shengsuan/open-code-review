@@ -21,7 +21,7 @@ COVERAGE_GATE ?= 1
 endif
 
 build:
-	go build -o $(ACP_BIN) ./cmd/ocr-acp
+	go build -trimpath -ldflags="-s -w" -o $(ACP_BIN) ./cmd/ocr-acp
 
 test:
 	LC_ALL=C go test $(GOTESTFLAGS) ./...

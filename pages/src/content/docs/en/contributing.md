@@ -40,7 +40,7 @@ git clone https://github.com/<your-username>/open-code-review.git
 cd open-code-review
 git remote add upstream https://github.com/alibaba/open-code-review.git
 
-make build       # writes dist/opencodereview (dist/opencodereview.exe on Windows)
+make build       # writes dist/ocr (dist/ocr.exe on Windows)
 make test        # LC_ALL=C go test -v -race -count=1 ./...
 ```
 
@@ -50,18 +50,18 @@ make test        # LC_ALL=C go test -v -race -count=1 ./...
 ### Running your local build
 
 ```bash
-./dist/opencodereview review --preview        # macOS / Linux
+./dist/ocr review --preview        # macOS / Linux
 .\dist\opencodereview.exe review --preview   # Windows (PowerShell / cmd)
 ```
 
 For convenience, drop a symlink at `~/bin/ocr-dev` pointing at
-`dist/opencodereview` so you can invoke `ocr-dev` from any repo.
+`dist/ocr` so you can invoke `ocr-dev` from any repo.
 
 ### Make targets
 
 | Target | What it does |
 |---|---|
-| `make build` | Build for current platform → `dist/opencodereview` (`dist/opencodereview.exe` on Windows). |
+| `make build` | Build for current platform → `dist/ocr` (`dist/ocr.exe` on Windows). |
 | `make build-darwin-amd64` | Cross-compile for macOS Intel. |
 | `make build-darwin-arm64` | Cross-compile for macOS Apple Silicon. |
 | `make build-linux-amd64` | Cross-compile for Linux x86_64. |
@@ -133,24 +133,19 @@ open-code-review/
 ├── imgs/                      # README images and logos
 ├── internal/
 │   ├── agent/                 # Review agent logic, sub-agent dispatch
-│   ├── chatgptauth/           # ChatGPT OAuth and credential management
 │   ├── config/                # Template, rules, allowlist, embedded JSON
-│   ├── delegate/              # Review specification generation without LLM calls
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/                  # Git diff parsing
 │   ├── gitcmd/                # Git subprocess runner
 │   ├── llm/                   # LLM clients and endpoint resolution
-│   ├── llmloop/               # LLM tool-use loop shared by review and scan
-│   ├── mcp/                   # MCP clients and tool adapters
+│   ├── llmloop/               # LLM tool-use loop shared by review tasks
 │   ├── model/                 # Data structs (LlmComment, Diff, …)
 │   ├── pathutil/              # Path utilities
 │   ├── release/               # Release artifact naming consistency checks
-│   ├── scan/                  # Full-file code review
 │   ├── session/               # JSONL session writer
 │   ├── stdout/                # Quiet-able stdout writer
 │   ├── suggestdiff/           # Suggestion diff rendering
-│   ├── telemetry/             # OpenTelemetry config + helpers
-│   ├── tool/                  # Tool registry + provider impls
-│   └── viewer/                # Embedded HTTP UI for browsing review sessions
+│   └── tool/                  # Tool registry + provider impls
 ├── pages/                     # Website landing page and docs (separate React app)
 ├── plugins/                   # Coding agent integrations (Claude Code, Codex, OpenCode, …)
 ├── extensions/                # VS Code and IntelliJ IDEA extensions, shared frontend

@@ -34,7 +34,6 @@ type Provider struct {
 	// there is no key to configure and demanding one would make the provider
 	// impossible to use.
 	AmbientAuth           bool
-	ExternalAuth          bool
 	RequiresStreaming     bool
 	RejectsSamplingParams bool
 	Models                []string
@@ -86,16 +85,6 @@ var registry = []Provider{
 			"global.anthropic.claude-sonnet-5",
 			"global.anthropic.claude-opus-4-8",
 		},
-	},
-	{
-		Name:                  "chatgpt",
-		DisplayName:           "ChatGPT plan (Sign in with ChatGPT preview)",
-		Protocol:              ProtocolOpenAIResponses,
-		BaseURL:               "https://api.openai.com/v1",
-		ExternalAuth:          true,
-		RequiresStreaming:     true,
-		RejectsSamplingParams: true,
-		Models:                []string{},
 	},
 	{
 		Name:        "openai",

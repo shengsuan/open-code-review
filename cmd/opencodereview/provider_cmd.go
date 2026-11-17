@@ -261,9 +261,6 @@ func checkAPIKeyRequirement(providerName, apiKey, apiKeyCmd string, preset llm.P
 }
 
 func providerUsesExternalCredentials(preset llm.Provider, entry ProviderEntry) bool {
-	if preset.ExternalAuth {
-		return true
-	}
 	if entry.Protocol != "" {
 		return llm.NormalizeProtocol(entry.Protocol) == llm.ProtocolAnthropicBedrock
 	}

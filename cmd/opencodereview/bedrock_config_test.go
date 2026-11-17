@@ -281,16 +281,9 @@ func TestCheckAPIKeyRequirement(t *testing.T) {
 	if !ok {
 		t.Fatal("anthropic preset not registered")
 	}
-	chatgpt, ok := llm.LookupProvider("chatgpt")
-	if !ok {
-		t.Fatal("chatgpt preset not registered")
-	}
 
 	if err := checkAPIKeyRequirement("bedrock", "", "", bedrock, true, ProviderEntry{}); err != nil {
 		t.Errorf("ambient provider with no api_key = %v, want nil", err)
-	}
-	if err := checkAPIKeyRequirement("chatgpt", "", "", chatgpt, true, ProviderEntry{}); err != nil {
-		t.Errorf("external-auth provider with no api_key = %v, want nil", err)
 	}
 
 	t.Setenv(anthropic.EnvVar, "")
@@ -305,11 +298,9 @@ func TestCheckAPIKeyRequirement(t *testing.T) {
 // TestProviderTUINonConfigCredentialProviderSkipsAPIKeyStep pins the wizard
 // flow: the model step is the last one for a provider with no key to collect.
 func TestProviderTUINonConfigCredentialProviderSkipsAPIKeyStep(t *testing.T) {
-	for _, provider := range []string{"bedrock", "chatgpt"} {
+	for _, provider := range []string{"bedrock"} {
 		t.Run(provider, func(t *testing.T) {
-			m := newProviderTUI(&Config{Providers: map[string]ProviderEntry{
-				"chatgpt": {Models: []string{"fixture-model"}},
-			}}, "")
+			m := newProviderTUI(&Config{}, "")
 			idx := -1
 			for i, p := range m.providers {
 				if p.Name == provider {
@@ -357,7 +348,7 @@ func TestProviderTUINonConfigCredentialProviderDropsPreviousKey(t *testing.T) {
 	original := runLLMTestPath
 	t.Cleanup(func() { runLLMTestPath = original })
 	runLLMTestPath = func(string) error { return nil }
-	for _, provider := range []string{"bedrock", "chatgpt"} {
+	for _, provider := range []string{"bedrock"} {
 		for _, typed := range []bool{false, true} {
 			name := provider + "/saved"
 			if typed {
@@ -365,8 +356,7 @@ func TestProviderTUINonConfigCredentialProviderDropsPreviousKey(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				cfg := &Config{Provider: "openai", Providers: map[string]ProviderEntry{
-					"openai":  {APIKey: "openai-fixture-key"},
-					"chatgpt": {Models: []string{"fixture-model"}},
+					"openai": {APIKey: "openai-fixture-key"},
 				}}
 				path := filepath.Join(t.TempDir(), "config.json")
 				m := newProviderTUI(cfg, path)

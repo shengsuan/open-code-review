@@ -5,16 +5,11 @@ package reviewtask
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 
 	"github.com/alibaba/open-code-review/internal/llm"
-	ocrmcp "github.com/alibaba/open-code-review/internal/mcp"
 	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/tool"
-	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type countingToolProvider struct {
@@ -85,78 +80,6 @@ func TestRunMainTaskRejectsUnadvertisedTools(t *testing.T) {
 			}
 			if allowed.calls != wantAllowed {
 				t.Fatalf("allowed tool calls = %d, want %d", allowed.calls, wantAllowed)
-			}
-		})
-	}
-}
-
-func TestRunMainTaskMCPAndGraceAvailability(t *testing.T) {
-	var mcpCalls atomic.Int64
-	server := sdkmcp.NewServer(&sdkmcp.Implementation{Name: "test", Version: "1"}, nil)
-	server.AddTool(&sdkmcp.Tool{Name: "external_lookup", InputSchema: map[string]any{"type": "object"}},
-		func(context.Context, *sdkmcp.CallToolRequest) (*sdkmcp.CallToolResult, error) {
-			mcpCalls.Add(1)
-			return &sdkmcp.CallToolResult{Content: []sdkmcp.Content{&sdkmcp.TextContent{Text: "external result"}}}, nil
-		})
-	httpServer := httptest.NewServer(sdkmcp.NewStreamableHTTPHandler(func(*http.Request) *sdkmcp.Server { return server }, nil))
-	defer httpServer.Close()
-	mcpClient, err := ocrmcp.NewRemoteClient(context.Background(), "test", httpServer.URL, nil, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer mcpClient.Close()
-	for _, mode := range []string{"advertised", "unadvertised", "grace"} {
-		t.Run(mode, func(t *testing.T) {
-			mcpCalls.Store(0)
-			client := &fakeClient{}
-			deps := newTestDeps(client)
-			deps.Session = session.New(t.TempDir(), "main", "fake", session.SessionOptions{})
-			reader := &countingToolProvider{name: "file_read"}
-			deps.Tools.Register(reader)
-			deps.Tools.Register(&tool.CodeCommentProvider{Collector: deps.CommentCollector})
-			ocrmcp.RegisterAll(deps.Tools, mcpClient, nil)
-			if mode != "unadvertised" {
-				deps.MainToolDefs = append(deps.MainToolDefs, ocrmcp.CollectToolDefs([]*ocrmcp.Client{mcpClient}, deps.Tools)...)
-			}
-			deps.MainToolDefs = append(deps.MainToolDefs, llm.ToolDef{Type: "function", Function: llm.FunctionDef{Name: "code_comment"}})
-			calls := toolCallResponse("external_lookup", `{}`)
-			calls.Choices[0].Message.ToolCalls = append(calls.ToolCalls(), fileReadToolCallResponse("read", `{}`).ToolCalls()...)
-			if mode == "grace" {
-				deps.Template.MaxToolRequestTimes = 1
-				calls.Choices[0].Message.ToolCalls = append(calls.ToolCalls(), codeCommentResponse("", "").ToolCalls()...)
-				calls.Choices[0].Message.ToolCalls = append(calls.ToolCalls(), taskDoneResponse().ToolCalls()...)
-				client.responses = []*llm.ChatResponse{{}, calls}
-			} else {
-				client.responses = []*llm.ChatResponse{calls, taskDoneResponse()}
-			}
-			runner := NewRunner(deps)
-			completed, _, err := runner.RunMainTask(context.Background(), []llm.Message{llm.NewTextMessage("user", "review")}, "main.go")
-			if err != nil || !completed || len(client.requests) != 2 {
-				t.Fatalf("completed=%v, err=%v, requests=%d", completed, err, len(client.requests))
-			}
-			wantMCP, wantRead, wantComments := int64(0), 1, 0
-			if mode == "advertised" {
-				wantMCP = 1
-			}
-			if mode == "grace" {
-				wantRead, wantComments = 0, 1
-				for _, def := range client.requests[1].Tools {
-					if def.Function.Name != "code_comment" && def.Function.Name != "task_done" {
-						t.Fatalf("unexpected grace definition: %+v", def)
-					}
-				}
-			} else {
-				wantResult := "external result"
-				if mode == "unadvertised" {
-					wantResult = tool.NotAvailableMsg
-				}
-				messages := client.requests[1].Messages
-				if got := messages[len(messages)-2].ExtractText(); got != wantResult {
-					t.Fatalf("MCP result = %q, want %q", got, wantResult)
-				}
-			}
-			if mcpCalls.Load() != wantMCP || reader.calls != wantRead || len(runner.CollectPendingComments()) != wantComments {
-				t.Fatalf("MCP/read/comments = %d/%d/%d, want %d/%d/%d", mcpCalls.Load(), reader.calls, len(runner.CollectPendingComments()), wantMCP, wantRead, wantComments)
 			}
 		})
 	}

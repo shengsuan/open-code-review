@@ -4,7 +4,8 @@
 	build-windows-amd64 build-windows-arm64 \
 	license-check license-add english-check
 
-BINARY_NAME := opencodereview
+BINARY_NAME := ocr
+RELEASE_NAME := opencodereview
 GO          := go
 DIST_DIR    := ./dist
 EXE         := $(if $(filter Windows_NT,$(OS)),.exe,)
@@ -25,13 +26,13 @@ RELEASE_LD_FLAGS := -s -w $(LD_FLAGS)
 
 define BUILD_PLATFORM
 	GOOS=$(1) GOARCH=$(2) CGO_ENABLED=0 $(GO) build -ldflags "$(RELEASE_LD_FLAGS)" \
-		-o $(DIST_DIR)/$(BINARY_NAME)-$(1)-$(2)$(3) \
+		-o $(DIST_DIR)/$(RELEASE_NAME)-$(1)-$(2)$(3) \
 		./cmd/opencodereview
 endef
 
 # ── Development targets ──────────────────────────────────────────────────────
 build:
-	$(GO) build -ldflags "$(LD_FLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)$(EXE) ./cmd/opencodereview
+	$(GO) build -ldflags "$(RELEASE_LD_FLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)$(EXE) ./cmd/opencodereview
 
 # No node_modules filter is needed for the docs site: pages/go.mod puts it in a
 # module of its own, so `go list ./...` skips that subtree entirely -- see that
@@ -109,7 +110,7 @@ build-all: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-a
 
 # Generate SHA256 checksums for all release binaries
 sha256sum: build-all
-	cd $(DIST_DIR) && shasum -a 256 $(BINARY_NAME)-* | sort > sha256sum.txt
+	cd $(DIST_DIR) && shasum -a 256 $(RELEASE_NAME)-* | sort > sha256sum.txt
 
 # Full release: clean → build all platforms → checksums
 dist: clean build-all sha256sum

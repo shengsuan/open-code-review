@@ -153,8 +153,8 @@ shasum -a 256 -c sha256sum.txt --ignore-missing
 ```bash
 git clone https://github.com/alibaba/open-code-review.git
 cd open-code-review
-make build              # 产出 dist/opencodereview（Windows 上是 dist/opencodereview.exe）
-sudo cp dist/opencodereview /usr/local/bin/ocr
+make build              # 产出 dist/ocr（Windows 上是 dist/ocr.exe）
+sudo cp dist/ocr /usr/local/bin/ocr
 ```
 
 #### 为其他平台构建

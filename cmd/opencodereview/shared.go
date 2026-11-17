@@ -4,7 +4,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -20,6 +19,7 @@ import (
 	"github.com/alibaba/open-code-review/internal/config/rules"
 	"github.com/alibaba/open-code-review/internal/config/template"
 	"github.com/alibaba/open-code-review/internal/config/toolsconfig"
+	"github.com/alibaba/open-code-review/internal/console"
 	"github.com/alibaba/open-code-review/internal/diff"
 	"github.com/alibaba/open-code-review/internal/gitcmd"
 	"github.com/alibaba/open-code-review/internal/llm"
@@ -27,7 +27,6 @@ import (
 	"github.com/alibaba/open-code-review/internal/model"
 	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/stdout"
-	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 )
 
@@ -809,7 +808,6 @@ type resumeInfoProvider interface {
 // agent; putting it on the interface would force internal/scan.Agent to
 // implement a method that is always nil.
 func emitRunResult(
-	ctx context.Context,
 	ag ResultProvider,
 	comments []model.LlmComment,
 	startTime time.Time,
@@ -823,12 +821,8 @@ func emitRunResult(
 	comments = diff.ResolveLineNumbers(comments, ag.Diffs())
 
 	duration := time.Since(startTime)
-	telemetry.RecordReviewDuration(ctx, duration)
-	if len(comments) > 0 {
-		telemetry.RecordCommentsGenerated(ctx, int64(len(comments)))
-	}
 
-	traceID := telemetry.TraceIDFromContext(ctx)
+	traceID := ""
 	manifest := ag.RunManifest()
 
 	// JSON and SARIF are machine-readable formats written to stdout; they
@@ -849,7 +843,7 @@ func emitRunResult(
 	}
 
 	if !machineReadable {
-		telemetry.PrintTraceSummary(telemetry.TraceSummary{
+		console.PrintTraceSummary(console.TraceSummary{
 			FilesReviewed:     ag.FilesReviewed(),
 			CommentsGenerated: int64(len(comments)),
 			InputTokens:       ag.TotalInputTokens(),

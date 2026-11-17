@@ -5,15 +5,11 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"go.opentelemetry.io/otel"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/alibaba/open-code-review/internal/agent"
 	"github.com/alibaba/open-code-review/internal/llm"
@@ -96,7 +92,7 @@ func TestEmitRunResult_JSONNoFiles(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 0}
 	identity := &jsonLLMIdentity{Provider: "anthropic", Model: "claude-opus-4-6"}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -126,7 +122,7 @@ func TestEmitRunResult_JSONIncludesToolFailureArguments(t *testing.T) {
 		}},
 	}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -147,7 +143,7 @@ func TestEmitRunResult_JSONLLMIdentityNamedProvider(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1}
 	identity := &jsonLLMIdentity{Provider: "anthropic", Model: "claude-opus-4-6"}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -164,7 +160,7 @@ func TestEmitRunResult_JSONLLMIdentityOmitsUnknownProvider(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1}
 	identity := &jsonLLMIdentity{Model: "gpt-5-codex"}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, identity, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -191,7 +187,7 @@ func TestEmitRunResult_JSONUsesManifestTerminalState(t *testing.T) {
 		},
 	}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -219,7 +215,7 @@ func TestEmitRunResult_JSONUsesManifestTerminalState(t *testing.T) {
 func TestEmitRunResult_JSONSkippedIncludesManifest(t *testing.T) {
 	ag := &mockResultProvider{manifest: mockManifest(session.StateSkipped)}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -274,7 +270,7 @@ func TestEmitRunResult_JSONManifestMatchesPersistedSessionEnd(t *testing.T) {
 
 	ag := &mockResultProvider{filesReviewed: 2, sessionID: sh.SessionID, manifest: sh.FinalManifest()}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -337,7 +333,7 @@ func TestEmitRunResult_JSONWithComments(t *testing.T) {
 	}
 	comments := []model.LlmComment{{Path: "main.go", Content: "fix", StartLine: 1, EndLine: 2}}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, comments, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, comments, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -366,7 +362,7 @@ func TestEmitRunResult_JSONWithResumeInfo(t *testing.T) {
 		},
 	}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -383,7 +379,7 @@ func TestEmitRunResult_JSONWithResumeInfo(t *testing.T) {
 func TestEmitRunResult_TextNoComments(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -396,7 +392,7 @@ func TestEmitRunResult_TextNoComments(t *testing.T) {
 func TestEmitRunResult_TextPartialNeverLooksGood(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: mockManifest(session.StatePartial)}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -414,7 +410,7 @@ func TestEmitRunResult_TextCompleteReportsFindingsAndWaived(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: manifest}
 	comments := []model.LlmComment{{Path: "a.go", Content: "fix", StartLine: 1, EndLine: 1}}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, comments, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, comments, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -428,7 +424,7 @@ func TestEmitRunResult_TextCompleteReportsFindingsAndWaived(t *testing.T) {
 func TestEmitRunResult_TextDoesNotPrintSuccessfulSessionHint(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, sessionID: "session-123"}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -442,7 +438,7 @@ func TestEmitRunResult_TextWithComments(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1}
 	comments := []model.LlmComment{{Path: "a.go", Content: "rename", StartLine: 5, EndLine: 10}}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, comments, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, comments, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -461,7 +457,7 @@ func TestEmitRunResult_TextWithProjectSummary(t *testing.T) {
 		projectSummary: "All tests pass, code quality is good.",
 	}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -478,7 +474,7 @@ func TestEmitRunResult_AgentTextRestoresQuiet(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1}
 	q := newQuietHandle("text", "agent")
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "agent", q, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "text", "agent", q, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -498,7 +494,7 @@ func TestEmitRunResult_AgentJSONDoesNotRestore(t *testing.T) {
 	}
 	q := newQuietHandle("json", "agent")
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "agent", q, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "json", "agent", q, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -513,7 +509,7 @@ func TestEmitRunResult_AgentJSONDoesNotRestore(t *testing.T) {
 func TestEmitRunResult_NilQuietHandle(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "agent", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "text", "agent", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -521,68 +517,10 @@ func TestEmitRunResult_NilQuietHandle(t *testing.T) {
 	_ = got
 }
 
-func TestEmitRunResult_JSONTraceIDFromContext(t *testing.T) {
-	tp := sdktrace.NewTracerProvider()
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-	otel.SetTracerProvider(tp)
-
-	ctx, span := tp.Tracer("test").Start(context.Background(), "test-root")
-	wantTraceID := span.SpanContext().TraceID().String()
-	defer span.End()
-
-	ag := &mockResultProvider{
-		filesReviewed: 2,
-		inputTokens:   10,
-		outputTokens:  5,
-		totalTokens:   15,
-	}
-	got := captureStdout(t, func() {
-		err := emitRunResult(ctx, ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	var out jsonOutput
-	if err := json.Unmarshal([]byte(got), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if out.TraceID != wantTraceID {
-		t.Errorf("trace_id = %q, want %q", out.TraceID, wantTraceID)
-	}
-}
-
-func TestEmitRunResult_JSONNoFilesTraceID(t *testing.T) {
-	tp := sdktrace.NewTracerProvider()
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-	otel.SetTracerProvider(tp)
-
-	ctx, span := tp.Tracer("test").Start(context.Background(), "test-root")
-	wantTraceID := span.SpanContext().TraceID().String()
-	defer span.End()
-
-	ag := &mockResultProvider{filesReviewed: 0}
-	got := captureStdout(t, func() {
-		err := emitRunResult(ctx, ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	var out jsonOutput
-	if err := json.Unmarshal([]byte(got), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if out.Status != "skipped" {
-		t.Errorf("status = %q, want skipped", out.Status)
-	}
-	if out.TraceID != wantTraceID {
-		t.Errorf("trace_id = %q, want %q", out.TraceID, wantTraceID)
-	}
-}
-
 func TestEmitRunResult_JSONIncludesSessionID(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1, sessionID: "session-99"}
 	got := captureStdout(t, func() {
-		err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
+		err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -605,7 +543,7 @@ func TestEmitRunResult_JSONCarriesRetryReport(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: mockManifest(session.StateComplete)}
 	rep := retryReportFixture()
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, rep); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, rep); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -628,7 +566,7 @@ func TestEmitRunResult_JSONCarriesRetryReport(t *testing.T) {
 func TestEmitRunResult_JSONOmitsRetryReportWhenNil(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: mockManifest(session.StateComplete)}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -646,7 +584,7 @@ func TestEmitRunResult_TextReportOrder(t *testing.T) {
 		projectSummary: "PROJECT-SUMMARY-MARKER",
 	}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -666,7 +604,7 @@ func TestEmitRunResult_TextReportOrder(t *testing.T) {
 func TestEmitRunResult_TextOmitsReportWhenNil(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: mockManifest(session.StateComplete)}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, nil); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -680,7 +618,7 @@ func TestEmitRunResult_TextOmitsReportWhenNil(t *testing.T) {
 func TestEmitRunResult_JSONHasNoReportText(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 2, manifest: mockManifest(session.StateComplete)}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})
@@ -745,7 +683,7 @@ func TestEmitRunResult_TextReportWithWarnings(t *testing.T) {
 		warnings:      []agent.AgentWarning{{Type: "subtask_error", File: "b.go", Message: "boom"}},
 	}
 	got := captureStdout(t, func() {
-		if err := emitRunResult(context.Background(), ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
+		if err := emitRunResult(ag, nil, time.Now(), "text", "developer", nil, nil, os.Stdout, retryReportFixture()); err != nil {
 			t.Fatalf("emitRunResult: %v", err)
 		}
 	})

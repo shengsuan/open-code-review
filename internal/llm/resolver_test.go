@@ -5,7 +5,6 @@ package llm
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/alibaba/open-code-review/internal/chatgptauth"
 )
 
 func TestStripModelSuffix(t *testing.T) {
@@ -1409,20 +1406,6 @@ func TestResolveEndpointWithModelOverride_AllBuiltInProvidersAcceptUnlistedModel
 	for _, provider := range ListProviders() {
 		t.Run(provider.Name, func(t *testing.T) {
 			entry := providerEntryConfig{APIKey: "test-key", AWSRegion: "us-west-2"}
-			var credentialCalls int
-			if provider.Name == "chatgpt" {
-				entry = providerEntryConfig{}
-				oldCredentials, oldModels := chatGPTCredentials, chatGPTModels
-				t.Cleanup(func() { chatGPTCredentials, chatGPTModels = oldCredentials, oldModels })
-				chatGPTCredentials = func(context.Context, string) (*chatgptauth.Auth, error) {
-					credentialCalls++
-					return &chatgptauth.Auth{ClientID: "account-fixture", AccessToken: "siwc-fixture"}, nil
-				}
-				chatGPTModels = func(context.Context, *chatgptauth.Auth) ([]chatgptauth.Model, error) {
-					t.Fatal("explicit ChatGPT model queried the catalog")
-					return nil, nil
-				}
-			}
 			path, _ := writeResolverConfig(t, configFile{
 				Provider: provider.Name,
 				Providers: map[string]providerEntryConfig{
@@ -1437,11 +1420,7 @@ func TestResolveEndpointWithModelOverride_AllBuiltInProvidersAcceptUnlistedModel
 			if err != nil || ep.Model != model || ep.Provider != provider.Name {
 				t.Fatalf("endpoint = %+v, error = %v", ep, err)
 			}
-			if provider.Name == "chatgpt" {
-				if credentialCalls != 1 || !ep.ChatGPTPlan || !ep.RequiresStreaming || !ep.RejectsSamplingParams || ep.URL != chatgptauth.Resource || ep.Token != "siwc-fixture" || ep.ChatGPTAccount != "account-fixture" || stderr != "" {
-					t.Fatalf("endpoint = %+v, credential calls = %d, stderr = %q", ep, credentialCalls, stderr)
-				}
-			} else if strings.Count(stderr, "[ocr] WARNING: model") != 1 || !strings.Contains(stderr, fmt.Sprintf("for provider %q", provider.Name)) {
+			if strings.Count(stderr, "[ocr] WARNING: model") != 1 || !strings.Contains(stderr, fmt.Sprintf("for provider %q", provider.Name)) {
 				t.Errorf("stderr = %q, want one warning for %s", stderr, provider.Name)
 			}
 		})

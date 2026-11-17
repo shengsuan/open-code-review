@@ -11,14 +11,12 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/alibaba/open-code-review/internal/model"
 	"github.com/alibaba/open-code-review/internal/session"
-	"github.com/alibaba/open-code-review/internal/viewer"
 	"github.com/spf13/cobra"
 )
 
@@ -95,31 +93,6 @@ var sessionCompareCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runSessionCompare(args[0], args[1])
-	},
-}
-
-var sessionExportRepoDir string
-var sessionExportOutput string
-
-var sessionExportCmd = &cobra.Command{
-	Use:   "export [flags] [session-id]",
-	Short: "Export one session as a self-contained HTML file",
-	Long: "Render a persisted review session as a single HTML file that opens offline:\n" +
-		"the viewer's stylesheet and script are inlined, so the artifact needs no network\n" +
-		"access and can be archived by CI. With no session id the newest session for the\n" +
-		"repo is exported.\n\n" +
-		"The artifact embeds the reviewed source excerpts the session recorded; treat it\n" +
-		"with the same care as the repository itself.",
-	Example: "  ocr session export -o review.html\n" +
-		"  ocr session export 20250601-100000-abc123 -o review.html",
-	Args:              maximumArgs(1),
-	ValidArgsFunction: completeSessionIDs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var id string
-		if len(args) == 1 {
-			id = args[0]
-		}
-		return runSessionExport(id)
 	},
 }
 
@@ -215,9 +188,6 @@ func init() {
 	sessionCompareCmd.Flags().StringVar(&sessionCompareRepoDir, "repo", "", "root directory of the git repository (default: current dir)")
 	sessionCompareCmd.Flags().BoolVar(&sessionCompareJSON, "json", false, "emit the comparison as JSON")
 
-	sessionExportCmd.Flags().StringVar(&sessionExportRepoDir, "repo", "", "root directory of the git repository (default: current dir)")
-	addOutputPathFlag(sessionExportCmd, &sessionExportOutput)
-
 	sessionRmCmd.Flags().StringVar(&sessionRmRepoDir, "repo", "", "only look for the session under this repository (default: every repository)")
 	sessionRmCmd.Flags().BoolVarP(&sessionRmYes, "yes", "y", false, "delete without asking for confirmation")
 
@@ -225,48 +195,7 @@ func init() {
 	sessionCmd.AddCommand(sessionShowCmd)
 	sessionCmd.AddCommand(sessionCommentsCmd)
 	sessionCmd.AddCommand(sessionCompareCmd)
-	sessionCmd.AddCommand(sessionExportCmd)
 	sessionCmd.AddCommand(sessionRmCmd)
-}
-
-// runSessionExport writes one session's standalone HTML page to --output, or to
-// stdout when it is unset. The session id is optional because a *successful*
-// `ocr review` never prints one — review_cmd.go only reports it on failure — so
-// requiring it would force every CI archive step through `--format json | jq`.
-func runSessionExport(sessionID string) (retErr error) {
-	resolvedRepo, err := resolveWorkingDirForSession(sessionExportRepoDir)
-	if err != nil {
-		return err
-	}
-
-	if sessionID == "" {
-		summaries, err := session.ListSessions(resolvedRepo)
-		if err != nil {
-			return err
-		}
-		if len(summaries) == 0 {
-			return fmt.Errorf("no sessions found for %s; run a review first, or pass a session id", resolvedRepo)
-		}
-		sessionID = summaries[0].SessionID
-	}
-
-	dir, err := session.SessionsDir(resolvedRepo)
-	if err != nil {
-		return err
-	}
-	root, encodedRepo := filepath.Split(dir)
-
-	out, closeOut, err := resolveOutputWriter(sessionExportOutput, "html")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := closeOut(); cerr != nil {
-			retErr = errors.Join(retErr, fmt.Errorf("close output file: %w", cerr))
-		}
-	}()
-
-	return viewer.ExportSession(out, filepath.Clean(root), encodedRepo, sessionID)
 }
 
 func runSessionList() error {

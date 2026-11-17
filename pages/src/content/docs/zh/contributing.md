@@ -37,7 +37,7 @@ git clone https://github.com/<your-username>/open-code-review.git
 cd open-code-review
 git remote add upstream https://github.com/alibaba/open-code-review.git
 
-make build       # writes dist/opencodereview (dist/opencodereview.exe on Windows)
+make build       # writes dist/ocr (dist/ocr.exe on Windows)
 make test        # LC_ALL=C go test -v -race -count=1 ./...
 ```
 
@@ -46,18 +46,18 @@ make test        # LC_ALL=C go test -v -race -count=1 ./...
 ### 运行本地构建
 
 ```bash
-./dist/opencodereview review --preview        # macOS / Linux
+./dist/ocr review --preview        # macOS / Linux
 .\dist\opencodereview.exe review --preview   # Windows (PowerShell / cmd)
 ```
 
-为方便起见，在 `~/bin/ocr-dev` 放一个指向 `dist/opencodereview` 的符号链接，即可在
+为方便起见，在 `~/bin/ocr-dev` 放一个指向 `dist/ocr` 的符号链接，即可在
 任意仓库调用 `ocr-dev`。
 
 ### Make target
 
 | Target | 作用 |
 |---|---|
-| `make build` | 为当前平台构建 → `dist/opencodereview`（Windows 上是 `dist/opencodereview.exe`）。 |
+| `make build` | 为当前平台构建 → `dist/ocr`（Windows 上是 `dist/ocr.exe`）。 |
 | `make build-darwin-amd64` | 交叉编译 macOS Intel。 |
 | `make build-darwin-arm64` | 交叉编译 macOS Apple Silicon。 |
 | `make build-linux-amd64` | 交叉编译 Linux x86_64。 |
@@ -128,24 +128,19 @@ open-code-review/
 ├── imgs/                      # README 图片与标志
 ├── internal/
 │   ├── agent/                 # 评审 agent 逻辑、子 agent 分发
-│   ├── chatgptauth/           # ChatGPT OAuth 与凭据管理
 │   ├── config/                # 模板、规则、白名单、内嵌 JSON
-│   ├── delegate/              # 无需调用 LLM 的审查规范生成
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/                  # Git diff 解析
 │   ├── gitcmd/                # Git 子进程运行器
 │   ├── llm/                   # LLM 客户端与端点解析
 │   ├── llmloop/               # Review 与 Scan 共用的 LLM 工具调用循环
-│   ├── mcp/                   # MCP 客户端与工具适配器
 │   ├── model/                 # 数据结构（LlmComment、Diff……）
 │   ├── pathutil/              # 路径工具
 │   ├── release/               # 发布产物命名一致性检查
-│   ├── scan/                  # 全文件代码审查
 │   ├── session/               # JSONL 会话写入器
 │   ├── stdout/                # 可静音的 stdout writer
 │   ├── suggestdiff/           # 建议 diff 渲染
-│   ├── telemetry/             # OpenTelemetry 配置 + 辅助
-│   ├── tool/                  # 工具注册表 + provider 实现
-│   └── viewer/                # 浏览审查会话的内嵌 HTTP UI
+│   └── tool/                  # 工具注册表 + provider 实现
 ├── pages/                     # 官网 Landing Page 与文档（独立 React app）
 ├── plugins/                   # 编码代理集成（Claude Code、Codex、OpenCode 等）
 ├── extensions/                # VS Code 与 IntelliJ IDEA 扩展、共享前端

@@ -408,8 +408,6 @@ type ClientConfig struct {
 	RetryCodes            []int             // Additional HTTP status codes that trigger retry
 	RequiresStreaming     bool
 	RejectsSamplingParams bool
-	ChatGPTPlan           bool
-	ChatGPTAccount        string
 	// SessionKey is the fallback prompt-cache affinity key
 	// for requests whose context carries none (see ContextWithSessionKey).
 	//
@@ -495,8 +493,6 @@ func NewLLMClient(ep ResolvedEndpoint, collector *RetryCollector, raw *RawHolder
 		RetryCodes:            ep.RetryCodes,
 		RequiresStreaming:     ep.RequiresStreaming,
 		RejectsSamplingParams: ep.RejectsSamplingParams,
-		ChatGPTPlan:           ep.ChatGPTPlan,
-		ChatGPTAccount:        ep.ChatGPTAccount,
 		retryCollector:        collector,
 		rawHolder:             raw,
 		AWSProfile:            ep.AWSProfile,

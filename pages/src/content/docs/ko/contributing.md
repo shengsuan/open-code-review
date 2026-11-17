@@ -40,7 +40,7 @@ git clone https://github.com/<your-username>/open-code-review.git
 cd open-code-review
 git remote add upstream https://github.com/alibaba/open-code-review.git
 
-make build       # writes dist/opencodereview (dist/opencodereview.exe on Windows)
+make build       # writes dist/ocr (dist/ocr.exe on Windows)
 make test        # LC_ALL=C go test -v -race -count=1 ./...
 ```
 
@@ -50,18 +50,18 @@ make test        # LC_ALL=C go test -v -race -count=1 ./...
 ### 로컬 빌드 실행하기 {#running-your-local-build}
 
 ```bash
-./dist/opencodereview review --preview        # macOS / Linux
+./dist/ocr review --preview        # macOS / Linux
 .\dist\opencodereview.exe review --preview   # Windows (PowerShell / cmd)
 ```
 
-편하게 쓰려면 `dist/opencodereview`를 가리키는 심볼릭 링크를 `~/bin/ocr-dev`에
+편하게 쓰려면 `dist/ocr`를 가리키는 심볼릭 링크를 `~/bin/ocr-dev`에
 걸어 두세요. 어느 저장소에서든 `ocr-dev`로 부를 수 있습니다.
 
 ### Make 타깃 {#make-targets}
 
 | 타깃 | 하는 일 |
 |---|---|
-| `make build` | 현재 플랫폼용으로 빌드해 `dist/opencodereview`(Windows에서는 `dist/opencodereview.exe`)에 씁니다. |
+| `make build` | 현재 플랫폼용으로 빌드해 `dist/ocr`(Windows에서는 `dist/ocr.exe`)에 씁니다. |
 | `make build-darwin-amd64` | macOS Intel용 크로스 컴파일. |
 | `make build-darwin-arm64` | macOS Apple Silicon용 크로스 컴파일. |
 | `make build-linux-amd64` | Linux x86_64용 크로스 컴파일. |
@@ -133,24 +133,19 @@ open-code-review/
 ├── imgs/                      # README 이미지와 로고
 ├── internal/
 │   ├── agent/                 # 리뷰 Agent 로직, 서브 Agent 디스패치
-│   ├── chatgptauth/           # ChatGPT OAuth와 자격 증명 관리
 │   ├── config/                # 템플릿, 규칙, 허용 목록, 내장 JSON
-│   ├── delegate/              # LLM 호출 없이 리뷰 명세 생성
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/                  # Git diff 파싱
 │   ├── gitcmd/                # Git 하위 프로세스 실행기
 │   ├── llm/                   # LLM 클라이언트와 엔드포인트 해석
 │   ├── llmloop/               # Review와 Scan이 공유하는 LLM 도구 호출 루프
-│   ├── mcp/                   # MCP 클라이언트와 도구 어댑터
 │   ├── model/                 # 데이터 구조체(LlmComment, Diff 등)
 │   ├── pathutil/              # 경로 유틸리티
 │   ├── release/               # 릴리스 산출물 이름의 일관성 검사
-│   ├── scan/                  # 전체 파일 코드 리뷰
 │   ├── session/               # JSONL 세션 기록기
 │   ├── stdout/                # 조용히 만들 수 있는 stdout 기록기
 │   ├── suggestdiff/           # 제안 diff 렌더링
-│   ├── telemetry/             # OpenTelemetry 설정과 헬퍼
-│   ├── tool/                  # 도구 레지스트리와 프로바이더 구현
-│   └── viewer/                # 리뷰 세션을 탐색하는 내장 HTTP UI
+│   └── tool/                  # 도구 레지스트리와 프로바이더 구현
 ├── pages/                     # 공식 웹사이트 랜딩 페이지와 문서(별도 React 앱)
 ├── plugins/                   # 코딩 에이전트 통합(Claude Code, Codex, OpenCode 등)
 ├── extensions/                # VS Code 및 IntelliJ IDEA 확장과 공유 프런트엔드

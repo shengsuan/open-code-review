@@ -154,7 +154,7 @@ func TestMakefileBuildMatchesURLPattern(t *testing.T) {
 	}
 	for _, p := range platforms {
 		rendered := outputTemplate
-		rendered = strings.ReplaceAll(rendered, "$(BINARY_NAME)", "opencodereview")
+		rendered = strings.ReplaceAll(rendered, "$(RELEASE_NAME)", "opencodereview")
 		rendered = strings.ReplaceAll(rendered, "$(1)", p.os)
 		rendered = strings.ReplaceAll(rendered, "$(2)", p.arch)
 		rendered = strings.ReplaceAll(rendered, "$(3)", p.ext)

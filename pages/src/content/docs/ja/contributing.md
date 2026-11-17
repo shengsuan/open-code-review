@@ -37,7 +37,7 @@ git clone https://github.com/<your-username>/open-code-review.git
 cd open-code-review
 git remote add upstream https://github.com/alibaba/open-code-review.git
 
-make build       # dist/opencodereview を書き出す（Windows では dist/opencodereview.exe）
+make build       # dist/ocr を書き出す（Windows では dist/ocr.exe）
 make test        # LC_ALL=C go test -v -race -count=1 ./...
 ```
 
@@ -46,18 +46,18 @@ make test        # LC_ALL=C go test -v -race -count=1 ./...
 ### ローカルビルドの実行
 
 ```bash
-./dist/opencodereview review --preview        # macOS / Linux
+./dist/ocr review --preview        # macOS / Linux
 .\dist\opencodereview.exe review --preview   # Windows (PowerShell / cmd)
 ```
 
-便宜のため、`dist/opencodereview` を指すシンボリックリンクを `~/bin/ocr-dev` に置いておくと、
+便宜のため、`dist/ocr` を指すシンボリックリンクを `~/bin/ocr-dev` に置いておくと、
 任意のリポジトリで `ocr-dev` を呼び出せます。
 
 ### Make target
 
 | Target | 作用 |
 |---|---|
-| `make build` | 現在のプラットフォーム向けにビルド → `dist/opencodereview`（Windows では `dist/opencodereview.exe`）。 |
+| `make build` | 現在のプラットフォーム向けにビルド → `dist/ocr`（Windows では `dist/ocr.exe`）。 |
 | `make build-darwin-amd64` | macOS Intel 向けのクロスコンパイル。 |
 | `make build-darwin-arm64` | macOS Apple Silicon 向けのクロスコンパイル。 |
 | `make build-linux-amd64` | Linux x86_64 向けのクロスコンパイル。 |
@@ -129,24 +129,19 @@ open-code-review/
 ├── imgs/                      # README 用の画像とロゴ
 ├── internal/
 │   ├── agent/                 # レビューエージェントのロジック、サブエージェントのディスパッチ
-│   ├── chatgptauth/           # ChatGPT OAuth と認証情報の管理
 │   ├── config/                # テンプレート、ルール、ホワイトリスト、埋め込み JSON
-│   ├── delegate/              # LLM を呼び出さないレビュー仕様の生成
+│   ├── console/               # Terminal output helpers for tool-call progress and summaries
 │   ├── diff/                  # Git diff の解析
 │   ├── gitcmd/                # Git サブプロセスランナー
 │   ├── llm/                   # LLM クライアントとエンドポイント解決
 │   ├── llmloop/               # Review と Scan で共有する LLM ツール呼び出しループ
-│   ├── mcp/                   # MCP クライアントとツールアダプター
 │   ├── model/                 # データ構造（LlmComment、Diff……）
 │   ├── pathutil/              # パスユーティリティ
 │   ├── release/               # リリース成果物の命名整合性チェック
-│   ├── scan/                  # ファイル全体のコードレビュー
 │   ├── session/               # JSONL セッションライター
 │   ├── stdout/                # ミュート可能な stdout writer
 │   ├── suggestdiff/           # 提案 diff のレンダリング
-│   ├── telemetry/             # OpenTelemetry の設定 + ヘルパー
-│   ├── tool/                  # ツールレジストリ + provider の実装
-│   └── viewer/                # レビューセッションを閲覧する埋め込み HTTP UI
+│   └── tool/                  # ツールレジストリ + provider の実装
 ├── pages/                     # 公式サイトのランディングページとドキュメント（独立した React app）
 ├── plugins/                   # コーディングエージェントとの連携（Claude Code、Codex、OpenCode など）
 ├── extensions/                # VS Code と IntelliJ IDEA の拡張、共有フロントエンド

@@ -8,12 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/alibaba/open-code-review/internal/chatgptauth"
 	openai "github.com/openai/openai-go/v3"
 	openaiopt "github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/packages/param"
@@ -28,9 +26,8 @@ import (
 // history (no previous_response_id), so the agent loop does not need to track
 // server-side response IDs. See DESIGN_STATE_CACHE_PHASE.md for the rationale.
 type OpenAIResponsesClient struct {
-	cfg          ClientConfig
-	sdk          openai.Client
-	chatGPTToken func(context.Context) (string, error)
+	cfg ClientConfig
+	sdk openai.Client
 }
 
 // NewOpenAIResponsesClient creates a client for the OpenAI Responses API.
@@ -51,10 +48,6 @@ func NewOpenAIResponsesClient(cfg ClientConfig) *OpenAIResponsesClient {
 
 	httpClient := httpClientWithHeaderTimeout(cfg.Timeout)
 	retries := 5
-	if cfg.ChatGPTPlan {
-		retries = 0
-		httpClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	}
 	opts := []openaiopt.RequestOption{
 		openaiopt.WithAPIKey(cfg.APIKey),
 		openaiopt.WithBaseURL(sdkBaseURL),
@@ -74,20 +67,10 @@ func NewOpenAIResponsesClient(cfg ClientConfig) *OpenAIResponsesClient {
 		opts = append(opts, openaiopt.WithMiddleware(newRetryObserver(cfg.retryCollector)))
 	}
 
-	client := &OpenAIResponsesClient{
+	return &OpenAIResponsesClient{
 		cfg: cfg,
 		sdk: openai.NewClient(opts...),
 	}
-	if cfg.ChatGPTPlan {
-		client.chatGPTToken = func(ctx context.Context) (string, error) {
-			auth, err := chatGPTCredentials(ctx, cfg.ChatGPTAccount)
-			if err != nil {
-				return "", err
-			}
-			return auth.AccessToken, nil
-		}
-	}
-	return client
 }
 
 // ensureResponsesEndpoint normalizes cfg.URL to end with /responses. The
@@ -125,24 +108,6 @@ func (c *OpenAIResponsesClient) CompletionsWithCtx(ctx context.Context, req Chat
 		finalizeRequest(ctx, c.cfg.retryCollector, err)
 	}()
 
-	var planToken string
-	if c.cfg.ChatGPTPlan {
-		if c.cfg.URL != chatgptauth.Resource+"/responses" || !c.cfg.RequiresStreaming {
-			return nil, errors.New("chatgpt preview requires the public OpenAI Responses endpoint and streaming")
-		}
-		if err := validateChatGPTBody(c.cfg.ExtraBody); err != nil {
-			return nil, err
-		}
-		for key := range c.cfg.ExtraHeaders {
-			if reservedHeaders[strings.ToLower(key)] || strings.EqualFold(key, "Host") {
-				return nil, fmt.Errorf("chatgpt cannot override header %s", key)
-			}
-		}
-		planToken, err = c.chatGPTToken(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
 	model := req.Model
 	if model == "" {
 		model = c.cfg.Model
@@ -156,9 +121,6 @@ func (c *OpenAIResponsesClient) CompletionsWithCtx(ctx context.Context, req Chat
 	}
 
 	var opts []openaiopt.RequestOption
-	if c.cfg.ChatGPTPlan {
-		opts = append(opts, openaiopt.WithAPIKey(planToken))
-	}
 	for k, v := range expandSessionKeyInHeaders(c.cfg.ExtraHeaders, sessionKey) {
 		opts = append(opts, openaiopt.WithHeader(k, v))
 	}
@@ -191,13 +153,6 @@ func (c *OpenAIResponsesClient) CompletionsWithCtx(ctx context.Context, req Chat
 		return nil, err
 	}
 
-	if c.cfg.ChatGPTPlan {
-		for _, item := range sdkResp.Output {
-			if item.Type == "function_call" && item.AsFunctionCall().Namespace != "ocr" {
-				return nil, errors.New("chatgpt returned a function call outside the offered OCR namespace")
-			}
-		}
-	}
 	return c.mapResponsesResponse(sdkResp), nil
 }
 
@@ -261,7 +216,7 @@ func (c *OpenAIResponsesClient) responsesStreamingInner(ctx context.Context, par
 	stream := c.sdk.Responses.NewStreaming(ctx, params, opts...)
 	defer stream.Close()
 
-	accumulator := responseStreamAccumulator{requireCompleted: c.cfg.ChatGPTPlan}
+	var accumulator responseStreamAccumulator
 	for stream.Next() {
 		if err := accumulator.add(stream.Current()); err != nil {
 			return nil, err
@@ -281,11 +236,10 @@ type indexedResponseOutputItem struct {
 const maxResponseStreamOutputBytes = 16 << 20
 
 type responseStreamAccumulator struct {
-	items            []indexedResponseOutputItem
-	outputBytes      int
-	terminal         *responses.Response
-	requireCompleted bool
-	terminalType     string
+	items        []indexedResponseOutputItem
+	outputBytes  int
+	terminal     *responses.Response
+	terminalType string
 }
 
 func (a *responseStreamAccumulator) add(event responses.ResponseStreamEventUnion) error {
@@ -304,23 +258,6 @@ func (a *responseStreamAccumulator) add(event responses.ResponseStreamEventUnion
 			raw:         json.RawMessage(raw),
 		})
 	case "response.completed", "response.failed", "response.incomplete":
-		if a.requireCompleted && event.Type != "response.completed" {
-			var envelope struct {
-				Error struct {
-					Param string `json:"param"`
-				} `json:"error"`
-				Incomplete json.RawMessage `json:"incomplete_details"`
-			}
-			if err := json.Unmarshal([]byte(event.Response.RawJSON()), &envelope); err != nil {
-				return err
-			}
-			message := fmt.Sprintf("%s: %s", event.Type, event.Response.Error.Message)
-			if len(envelope.Incomplete) > 0 && string(envelope.Incomplete) != "null" {
-				message += " " + string(envelope.Incomplete)
-			}
-			message += "; Manage usage: " + chatgptauth.UsageURL
-			return &responseStreamEventError{code: string(event.Response.Error.Code), param: envelope.Error.Param, message: message}
-		}
 		a.terminalType = event.Type
 		response := event.Response
 		if len(response.RawJSON()) > maxResponseStreamOutputBytes-a.outputBytes {
@@ -342,15 +279,6 @@ func (a *responseStreamAccumulator) response() (*responses.Response, error) {
 	if a.terminal == nil {
 		return nil, &streamIntegrityError{reason: "ended before a terminal event"}
 	}
-	if a.requireCompleted {
-		if a.terminalType != "response.completed" || a.terminal.Status != responses.ResponseStatusCompleted {
-			return nil, &responseStatusError{message: "chatgpt stream did not reach response.completed"}
-		}
-		if len(a.terminal.Output) > 0 {
-			return a.terminal, nil
-		}
-	}
-
 	sort.SliceStable(a.items, func(i, j int) bool {
 		return a.items[i].outputIndex < a.items[j].outputIndex
 	})
@@ -421,11 +349,7 @@ func (c *OpenAIResponsesClient) buildResponsesParams(model string, req ChatReque
 				systemParts = append(systemParts, content)
 			}
 		case "developer":
-			role := responses.EasyInputMessageRoleUser
-			if c.cfg.ChatGPTPlan {
-				role = responses.EasyInputMessageRoleDeveloper
-			}
-			input = append(input, responses.ResponseInputItemParamOfMessage(content, role))
+			input = append(input, responses.ResponseInputItemParamOfMessage(content, responses.EasyInputMessageRoleUser))
 		case "user":
 			input = append(input, responses.ResponseInputItemParamOfMessage(content, responses.EasyInputMessageRoleUser))
 		case "assistant":
@@ -438,11 +362,7 @@ func (c *OpenAIResponsesClient) buildResponsesParams(model string, req ChatReque
 				input = append(input, responses.ResponseInputItemParamOfMessage(content, responses.EasyInputMessageRoleAssistant))
 			}
 			for _, tc := range msg.ToolCalls {
-				item := responses.ResponseInputItemParamOfFunctionCall(tc.Function.Arguments, tc.ID, tc.Function.Name)
-				if c.cfg.ChatGPTPlan {
-					item.OfFunctionCall.Namespace = openai.String("ocr")
-				}
-				input = append(input, item)
+				input = append(input, responses.ResponseInputItemParamOfFunctionCall(tc.Function.Arguments, tc.ID, tc.Function.Name))
 			}
 		case "tool":
 			input = append(input, responses.ResponseInputItemParamOfFunctionCallOutput(msg.ToolCallID, content))
@@ -473,15 +393,6 @@ func (c *OpenAIResponsesClient) buildResponsesParams(model string, req ChatReque
 		Include: []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent},
 	}
 
-	if c.cfg.ChatGPTPlan && len(req.Tools) > 0 {
-		var functions []responses.NamespaceToolToolUnionParam
-		for _, t := range req.Tools {
-			functions = append(functions, responses.NamespaceToolToolUnionParam{OfFunction: &responses.NamespaceToolToolFunctionParam{
-				Name: t.Function.Name, Parameters: t.Function.Parameters, Strict: openai.Bool(false), Description: openai.String(t.Function.Description),
-			}})
-		}
-		tools = []responses.ToolUnionParam{{OfNamespace: &responses.NamespaceToolParam{Name: "ocr", Description: "OpenCodeReview local review tools", Tools: functions}}}
-	}
 	if instructions != "" {
 		params.Instructions = openai.String(instructions)
 	}
@@ -496,7 +407,7 @@ func (c *OpenAIResponsesClient) buildResponsesParams(model string, req ChatReque
 			}
 		}
 	}
-	if !c.cfg.RejectsSamplingParams && !c.cfg.ChatGPTPlan {
+	if !c.cfg.RejectsSamplingParams {
 		if req.MaxTokens > 0 {
 			params.MaxOutputTokens = openai.Int(int64(req.MaxTokens))
 		}
@@ -588,19 +499,9 @@ func (c *OpenAIResponsesClient) mapResponsesResponse(sdkResp *responses.Response
 		}
 	}
 
-	var rawUsageJSON json.RawMessage
-	if c.cfg.ChatGPTPlan {
-		var envelope struct {
-			Usage json.RawMessage `json:"usage"`
-		}
-		if json.Unmarshal([]byte(sdkResp.RawJSON()), &envelope) == nil {
-			rawUsageJSON = envelope.Usage
-		}
-	}
 	return &ChatResponse{
-		ID:       sdkResp.ID,
-		Model:    string(sdkResp.Model),
-		RawUsage: rawUsageJSON,
+		ID:    sdkResp.ID,
+		Model: string(sdkResp.Model),
 		Choices: []Choice{{
 			Message: ResponseMessage{
 				Role:             "assistant",

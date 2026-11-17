@@ -177,46 +177,6 @@ func TestParseReviewFlags_FromWithCommitStillConflicts(t *testing.T) {
 	}
 }
 
-func TestDelegateDiffModes(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		wantTo  string
-		wantErr string
-	}{
-		{name: "workspace"},
-		{name: "default target", args: []string{"--from", "main"}, wantTo: "HEAD"},
-		{name: "explicit target", args: []string{"--from", "main", "--to", "feature"}, wantTo: "feature"},
-		{name: "commit", args: []string{"--commit", "abc123"}},
-		{name: "missing base", args: []string{"--to", "HEAD"}, wantErr: "--from is required when --to is specified"},
-		{name: "conflicting shorthand", args: []string{"--from", "main", "--commit", "abc123"}, wantErr: "only one review mode allowed"},
-		{name: "conflicting range", args: []string{"--from", "main", "--to", "HEAD", "--commit", "abc123"}, wantErr: "only one review mode allowed"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var opts delegateOptions
-			cmd := &cobra.Command{Use: "delegate"}
-			registerDelegateFlags(cmd, &opts)
-			if err := cmd.ParseFlags(test.args); err != nil {
-				t.Fatal(err)
-			}
-			err := validateDelegateOptions(&opts)
-			if test.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
-					t.Fatalf("error = %v, want %q", err, test.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if opts.to != test.wantTo {
-				t.Fatalf("to = %q, want %q", opts.to, test.wantTo)
-			}
-		})
-	}
-}
-
 func TestParseReviewFlags_ToWithoutFrom(t *testing.T) {
 	_, err := parseReviewFlags([]string{"--to", "dev"})
 	if err == nil {
@@ -269,44 +229,6 @@ func TestCommandNeedsGit(t *testing.T) {
 	}
 }
 
-// TestCommandNeedsGit_Subcommands verifies that the git check keys off the
-// top-level command rather than the leaf: the delegate subcommands shell out to
-// git, while the no-op parent help commands do not.
-func TestCommandNeedsGit_Subcommands(t *testing.T) {
-	root := &cobra.Command{Use: "ocr"}
-	delegate := &cobra.Command{Use: "delegate"}
-	delegatePreview := &cobra.Command{Use: "preview"}
-	delegateRule := &cobra.Command{Use: "rule"}
-	delegate.AddCommand(delegatePreview, delegateRule)
-	root.AddCommand(delegate)
-
-	rules := &cobra.Command{Use: "rules"}
-	rulesCheck := &cobra.Command{Use: "check"}
-	rules.AddCommand(rulesCheck)
-	root.AddCommand(rules)
-
-	tests := []struct {
-		name string
-		cmd  *cobra.Command
-		want bool
-	}{
-		{name: "delegate preview", cmd: delegatePreview, want: true},
-		{name: "delegate rule", cmd: delegateRule, want: true},
-		{name: "delegate", cmd: delegate, want: true},
-		{name: "rules check", cmd: rulesCheck, want: false},
-		{name: "rules", cmd: rules, want: false},
-		{name: "root", cmd: root, want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := commandNeedsGit(tt.cmd); got != tt.want {
-				t.Errorf("commandNeedsGit(%q) = %v, want %v", tt.cmd.CommandPath(), got, tt.want)
-			}
-		})
-	}
-}
-
 func TestCommandNeedsGit_RootVersionFlag(t *testing.T) {
 	cmd := &cobra.Command{Use: "ocr"}
 	cmd.Flags().BoolP("version", "V", false, "version for ocr")
@@ -342,27 +264,10 @@ func TestParseReviewFlags_OutputPath(t *testing.T) {
 	}
 }
 
-func TestParseScanFlags_OutputPath(t *testing.T) {
-	opts, err := parseScanFlags([]string{"--output", "scan.json"})
-	if err != nil {
-		t.Fatalf("parseScanFlags: %v", err)
-	}
-	if opts.outputPath != "scan.json" {
-		t.Errorf("outputPath = %q, want scan.json", opts.outputPath)
-	}
-}
-
 func TestParseReviewFlags_InvalidFormat(t *testing.T) {
 	_, err := parseReviewFlags([]string{"--format", "xml"})
 	if err == nil {
 		t.Fatal("expected error for invalid format 'xml'")
-	}
-}
-
-func TestParseScanFlags_InvalidFormat(t *testing.T) {
-	_, err := parseScanFlags([]string{"--format", "yaml"})
-	if err == nil {
-		t.Fatal("expected error for invalid format 'yaml'")
 	}
 }
 
@@ -373,86 +278,5 @@ func TestParseReviewFlags_NormalizedFormat(t *testing.T) {
 	}
 	if opts.outputFormat != "json" {
 		t.Errorf("outputFormat = %q, want json", opts.outputFormat)
-	}
-}
-
-func TestParseScanFlags_NormalizedFormat(t *testing.T) {
-	opts, err := parseScanFlags([]string{"--format", " SARIF "})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if opts.outputFormat != "sarif" {
-		t.Errorf("outputFormat = %q, want sarif", opts.outputFormat)
-	}
-}
-
-func TestConcurrencyFlagUsageUsesSubtask(t *testing.T) {
-	var reviewOpts reviewOptions
-	reviewCmd := &cobra.Command{Use: "review"}
-	registerReviewFlags(reviewCmd, &reviewOpts)
-	reviewFlag := reviewCmd.Flags().Lookup("concurrency")
-	if reviewFlag == nil {
-		t.Fatal("review --concurrency flag missing")
-	}
-
-	var scanOpts scanOptions
-	scanCmd := &cobra.Command{Use: "scan"}
-	registerScanFlags(scanCmd, &scanOpts)
-	scanFlag := scanCmd.Flags().Lookup("concurrency")
-	if scanFlag == nil {
-		t.Fatal("scan --concurrency flag missing")
-	}
-
-	for _, tc := range []struct {
-		cmd   string
-		usage string
-	}{
-		{"review", reviewFlag.Usage},
-		{"scan", scanFlag.Usage},
-	} {
-		if !strings.Contains(tc.usage, "subtask") {
-			t.Errorf("%s --concurrency usage %q: want subtask unit", tc.cmd, tc.usage)
-		}
-		for _, leaked := range []string{"file-group", "file group", "file scans"} {
-			if strings.Contains(tc.usage, leaked) {
-				t.Errorf("%s --concurrency usage %q: leaked %q", tc.cmd, tc.usage, leaked)
-			}
-		}
-	}
-	if reviewFlag.Usage != scanFlag.Usage {
-		t.Errorf("review and scan --concurrency should share phrasing: review %q scan %q", reviewFlag.Usage, scanFlag.Usage)
-	}
-}
-
-func TestScanMaxToolsFlagUsageUsesSubtask(t *testing.T) {
-	var reviewOpts reviewOptions
-	reviewCmd := &cobra.Command{Use: "review"}
-	registerReviewFlags(reviewCmd, &reviewOpts)
-	reviewFlag := reviewCmd.Flags().Lookup("max-tools")
-	if reviewFlag == nil {
-		t.Fatal("review --max-tools flag missing")
-	}
-
-	var scanOpts scanOptions
-	scanCmd := &cobra.Command{Use: "scan"}
-	registerScanFlags(scanCmd, &scanOpts)
-	scanFlag := scanCmd.Flags().Lookup("max-tools")
-	if scanFlag == nil {
-		t.Fatal("scan --max-tools flag missing")
-	}
-
-	for _, tc := range []struct {
-		cmd   string
-		usage string
-	}{
-		{"review", reviewFlag.Usage},
-		{"scan", scanFlag.Usage},
-	} {
-		if !strings.Contains(tc.usage, "subtask") {
-			t.Errorf("%s --max-tools usage %q: want subtask unit", tc.cmd, tc.usage)
-		}
-		if strings.Contains(tc.usage, "per file") {
-			t.Errorf("%s --max-tools usage %q: leaked per file", tc.cmd, tc.usage)
-		}
 	}
 }

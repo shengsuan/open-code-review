@@ -172,8 +172,8 @@ without a pre-built binary.
 ```bash
 git clone https://github.com/alibaba/open-code-review.git
 cd open-code-review
-make build              # writes dist/opencodereview (dist/opencodereview.exe on Windows)
-sudo cp dist/opencodereview /usr/local/bin/ocr
+make build              # writes dist/ocr (dist/ocr.exe on Windows)
+sudo cp dist/ocr /usr/local/bin/ocr
 ```
 
 #### Build for another platform

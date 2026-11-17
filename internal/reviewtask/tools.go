@@ -7,11 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alibaba/open-code-review/internal/console"
 	"github.com/alibaba/open-code-review/internal/diff"
 	"github.com/alibaba/open-code-review/internal/llm"
 	"github.com/alibaba/open-code-review/internal/model"
 	"github.com/alibaba/open-code-review/internal/session"
-	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"time"
 )
@@ -62,8 +62,8 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	args, err := parseToolArgs(call.Function.Arguments)
 	if err != nil {
 		errMsg := fmt.Sprintf("Error parsing tool arguments for %s: %v", toolName, err)
-		telemetry.PrintToolCallStarted(toolName, nil)
-		telemetry.PrintToolCallError(toolName, fmt.Errorf("%s", errMsg))
+		console.PrintToolCallStarted(toolName, nil)
+		console.PrintToolCallError(toolName, fmt.Errorf("%s", errMsg))
 		r.RecordToolFailure(toolCallNumber, toolName, taskKey, errMsg,
 			rec, call.Function.Arguments, time.Since(callStarted))
 		return r.toolFailureResult(taskKey, toolName, errMsg)
@@ -72,8 +72,7 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	startTime := time.Now()
 
 	if t == tool.CodeComment {
-		telemetry.PrintToolCallStarted(t.Name(), args)
-		_, toolSpan := telemetry.StartToolSpan(ctx, t.Name())
+		console.PrintToolCallStarted(t.Name(), args)
 
 		comments, repair, errMsg := tool.ParseCommentsWithPath(args, taskKey)
 		if repair != nil {
@@ -89,12 +88,9 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 		if errMsg != "" {
 			dur := time.Since(startTime)
 			toolErr := fmt.Errorf("%s", errMsg)
-			telemetry.RecordToolResult(toolSpan, t.Name(), dur.Milliseconds(), toolErr)
-			toolSpan.End()
-			telemetry.RecordToolCall(ctx, t.Name(), dur, false)
 			r.RecordToolFailure(toolCallNumber, toolName, taskKey, errMsg,
 				rec, call.Function.Arguments, dur)
-			telemetry.PrintToolCallError(t.Name(), toolErr)
+			console.PrintToolCallError(t.Name(), toolErr)
 			return r.toolFailureResult(taskKey, toolName, errMsg)
 		}
 
@@ -174,24 +170,18 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 			pool.SubmitFor(taskKey, func() ([]model.LlmComment, error) {
 				defer func() {
 					dur := time.Since(startTime)
-					telemetry.RecordToolResult(toolSpan, toolName, dur.Milliseconds(), nil)
-					toolSpan.End()
-					telemetry.PrintToolCallFinished(toolName, dur)
+					console.PrintToolCallFinished(toolName, dur)
 				}()
 				resolveAndCollect(asyncCtx)
 				return []model.LlmComment{}, nil
 			})
-			telemetry.RecordToolCall(asyncCtx, toolName, time.Since(startTime), true)
 			r.resetToolFailureStreak(taskKey, t.Name())
 			return tool.Of(tool.CommentSucceed)
 		}
 
 		resolveAndCollect(ctx)
 		dur := time.Since(startTime)
-		telemetry.RecordToolResult(toolSpan, t.Name(), dur.Milliseconds(), nil)
-		toolSpan.End()
-		telemetry.RecordToolCall(ctx, t.Name(), dur, true)
-		telemetry.PrintToolCallFinished(t.Name(), dur)
+		console.PrintToolCallFinished(t.Name(), dur)
 		if rec != nil {
 			rec.AddToolResult(t.Name(), call.Function.Arguments, tool.CommentSucceed)
 		}
@@ -200,22 +190,17 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	}
 
 	// Synchronous path for all other tools
-	telemetry.PrintToolCallStarted(toolName, args)
-	_, toolSpan := telemetry.StartToolSpan(ctx, toolName)
+	console.PrintToolCallStarted(toolName, args)
 	result, err := p.Execute(ctx, args)
 	dur := time.Since(startTime)
-	ok := err == nil
-	telemetry.RecordToolResult(toolSpan, toolName, dur.Milliseconds(), err)
-	toolSpan.End()
-	telemetry.RecordToolCall(ctx, toolName, dur, ok)
 
 	if err != nil {
 		r.RecordToolFailure(toolCallNumber, toolName, taskKey, err.Error(),
 			rec, call.Function.Arguments, dur)
-		telemetry.PrintToolCallError(toolName, err)
+		console.PrintToolCallError(toolName, err)
 		return r.toolFailureResult(taskKey, toolName, fmt.Sprintf("Error executing tool %s: %v", toolName, err))
 	}
-	telemetry.PrintToolCallFinished(toolName, dur)
+	console.PrintToolCallFinished(toolName, dur)
 	if rec != nil {
 		rec.AddToolResult(toolName, call.Function.Arguments, result)
 	}

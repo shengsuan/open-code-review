@@ -7,13 +7,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/alibaba/open-code-review/internal/config/template"
 	"github.com/alibaba/open-code-review/internal/llm"
 	"github.com/alibaba/open-code-review/internal/model"
 	"github.com/alibaba/open-code-review/internal/stdout"
-	"github.com/alibaba/open-code-review/internal/telemetry"
 )
 
 // BuildReLocationMessages renders the re-location prompt for cm against d.
@@ -59,26 +57,15 @@ func ReLocateComment(
 		return false, nil
 	}
 
-	startTime := time.Now()
-	_, llmSpan := telemetry.StartLLMSpan(ctx, modelName)
 	resp, err := client.CompletionsWithCtx(ctx, llm.ChatRequest{
 		Model:     modelName,
 		Messages:  messages,
 		MaxTokens: maxTokens,
 	})
-	duration := time.Since(startTime)
 	if err != nil {
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
 		fmt.Fprintf(stdout.Writer(), "[ocr] Re-location LLM call failed for %s: %v\n", cm.Path, err)
 		return false, nil
 	}
-	var totalTokens int64
-	if resp.Usage != nil {
-		totalTokens = resp.Usage.TotalTokens
-	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
 
 	code := extractCodeBlock(resp.Content())
 	if code == "" {
